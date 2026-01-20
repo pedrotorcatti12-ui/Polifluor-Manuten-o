@@ -1,11 +1,11 @@
-
 import React, { useState, useMemo } from 'react';
 import { Header } from '../components/Header';
 import { Equipment, MaintenanceStatus, MaintenanceType, MaintenanceTask } from '../types';
-import { DownloadIcon, ArrowPathIcon } from '../components/icons';
+import { DownloadIcon, ArrowPathIcon, WrenchIcon, DocumentTextIcon } from '../components/icons';
 import { useDataContext } from '../contexts/DataContext';
 import { ParetoChart } from '../components/ParetoChart';
 import { MONTHS } from '../constants';
+import { DatabaseScriptsModal } from '../components/DatabaseScriptsModal';
 
 declare const window: any;
 
@@ -15,15 +15,14 @@ interface ReportRecord {
 }
 
 const generateDetailedPDF = (records: ReportRecord[], startDate: string, endDate: string) => {
-    if (typeof window.jspdf === 'undefined' || typeof window.jspdf.jsPDF === 'undefined' || typeof (new window.jspdf.jsPDF()).autoTable !== 'function') {
-        throw new Error('A biblioteca de geração de PDF não pôde ser carregada. Verifique sua conexão com a internet e tente novamente.');
+    if (typeof window.jspdf === 'undefined') {
+        throw new Error('As bibliotecas de PDF não foram carregadas. Verifique sua conexão.');
     }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
     const margin = 15;
     const pageW = doc.internal.pageSize.getWidth();
 
-    // Header
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('Relatório Detalhado de Manutenções Executadas', pageW / 2, margin, { align: 'center' });
@@ -42,7 +41,7 @@ const generateDetailedPDF = (records: ReportRecord[], startDate: string, endDate
         return [
             task.osNumber || 'N/A',
             task.endDate ? new Date(task.endDate).toLocaleDateString('pt-BR') : 'N/A',
-            `${equipment.id} - ${equipment.name}`,
+            `${equipment?.id || 'N/A'} - ${equipment?.name || 'Não identificado'}`,
             task.type,
             task.description,
             detailsText,
@@ -51,7 +50,13 @@ const generateDetailedPDF = (records: ReportRecord[], startDate: string, endDate
         ];
     });
 
-    (doc as any).autoTable({
+    // Final safety check for autoTable
+    const autoTable = (doc as any).autoTable;
+    if (typeof autoTable !== 'function') {
+        throw new Error("O plugin de tabelas do PDF ainda não está pronto. Tente novamente em 2 segundos.");
+    }
+
+    autoTable.call(doc, {
         startY: y,
         head: [['OS', 'Data', 'Equipamento', 'Tipo', 'Descrição', 'Ações Executadas', 'Resp.', 'HH']],
         body: tableBody,
@@ -74,38 +79,27 @@ const generateDetailedPDF = (records: ReportRecord[], startDate: string, endDate
 };
 
 export const ReportsPage: React.FC = () => {
-    const { equipmentData, workOrders } = useDataContext();
+    const { equipmentData, workOrders, showToast } = useDataContext();
     const [selectedEquipmentIds, setSelectedEquipmentIds] = useState<string[]>([]);
     const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [generatedRecords, setGeneratedRecords] = useState<ReportRecord[] | null>(null);
     const [isPrinting, setIsPrinting] = useState(false);
+    const [isSqlModalOpen, setIsSqlModalOpen] = useState(false);
 
-    // Lógica do Gráfico de Pareto
     const paretoData = useMemo(() => {
         const failureCounts: { [key: string]: number } = {};
         
-        // Função auxiliar para verificar se uma tarefa deve entrar no Gráfico
         const isValidForPareto = (task: MaintenanceTask, eqId: string) => {
-            // 1. Status deve ser Executado
             if (task.status !== MaintenanceStatus.Executed) return false;
-
-            // 2. Tipo deve ser Corretiva (Pareto é SEMPRE sobre falhas, ignorando o filtro da UI de tipos)
             if (task.type !== MaintenanceType.Corrective) return false;
-
-            // 3. Deve ter uma categoria definida
             if (!task.correctiveCategory) return false;
-
-            // 4. Filtro de Equipamento (Respeita a seleção da UI)
             if (selectedEquipmentIds.length > 0 && !selectedEquipmentIds.includes(eqId)) return false;
 
-            // 5. Filtro de Data (Respeita a seleção da UI)
             if (startDate || endDate) {
-                // Normalização de datas para comparação
                 const taskDateStr = task.endDate || task.startDate;
                 let taskDate: Date;
-
                 if (taskDateStr) {
                     taskDate = new Date(taskDateStr);
                 } else if (task.month) {
@@ -115,24 +109,12 @@ export const ReportsPage: React.FC = () => {
                 } else {
                     return false;
                 }
-                
-                if (startDate) {
-                    const startFilter = new Date(startDate);
-                    // Resetar horas para garantir comparação justa de data
-                    if (taskDate < startFilter) return false;
-                }
-                
-                if (endDate) {
-                    const endFilter = new Date(endDate);
-                    endFilter.setHours(23, 59, 59, 999); // Final do dia
-                    if (taskDate > endFilter) return false;
-                }
+                if (startDate && taskDate < new Date(startDate)) return false;
+                if (endDate && taskDate > new Date(new Date(endDate).setHours(23, 59, 59, 999))) return false;
             }
-
             return true;
         };
 
-        // Processar Equipamentos (Cronograma Interno)
         equipmentData.forEach(eq => {
             eq.schedule.forEach(task => {
                 if (isValidForPareto(task, eq.id)) {
@@ -141,9 +123,7 @@ export const ReportsPage: React.FC = () => {
             });
         });
 
-        // Processar Ordens Avulsas (WorkOrders)
         workOrders.forEach(wo => {
-            // Converter WO para formato similar a Task para validação
             const woAsTask: MaintenanceTask = {
                 id: wo.id,
                 year: wo.scheduledDate ? new Date(wo.scheduledDate).getFullYear() : 0,
@@ -151,11 +131,10 @@ export const ReportsPage: React.FC = () => {
                 status: wo.status,
                 type: wo.type,
                 description: wo.description,
-                correctiveCategory: wo.correctiveCategory, // Campo agora disponível na interface
+                correctiveCategory: wo.correctiveCategory,
                 startDate: wo.scheduledDate,
                 endDate: wo.status === MaintenanceStatus.Executed ? wo.scheduledDate : undefined,
             };
-            
             if (wo.correctiveCategory && isValidForPareto(woAsTask, wo.equipmentId)) {
                  failureCounts[wo.correctiveCategory] = (failureCounts[wo.correctiveCategory] || 0) + 1;
             }
@@ -165,11 +144,11 @@ export const ReportsPage: React.FC = () => {
             category,
             count
         }));
-    }, [equipmentData, workOrders, selectedEquipmentIds, startDate, endDate]); // Note: removed selectedTypes
+    }, [equipmentData, workOrders, selectedEquipmentIds, startDate, endDate]);
 
     const handleGenerateReport = () => {
         if (!startDate || !endDate) {
-            alert("Por favor, selecione um período de datas.");
+            showToast("Selecione o período de datas", "warning");
             return;
         }
         
@@ -178,39 +157,33 @@ export const ReportsPage: React.FC = () => {
             ? equipmentData.filter(e => selectedEquipmentIds.includes(e.id))
             : equipmentData;
 
-        // 1. Tarefas do Cronograma
         equipmentToFilter.forEach(equipment => {
             equipment.schedule.forEach(task => {
                 const isExecuted = task.status === MaintenanceStatus.Executed;
                 const taskDate = task.endDate ? new Date(task.endDate) : null;
                 const isInPeriod = taskDate && taskDate >= new Date(startDate) && taskDate <= new Date(new Date(endDate).setHours(23, 59, 59, 999));
                 const typeMatch = selectedTypes.length === 0 || (task.type && selectedTypes.includes(task.type));
-
                 if (isExecuted && isInPeriod && typeMatch) {
                     records.push({ task, equipment });
                 }
             });
         });
 
-        // 2. Ordens de Serviço Avulsas
         workOrders.forEach(wo => {
-            // Check Filter Equipment
             if (selectedEquipmentIds.length > 0 && !selectedEquipmentIds.includes(wo.equipmentId)) return;
-
             const isExecuted = wo.status === MaintenanceStatus.Executed;
             const taskDate = wo.scheduledDate ? new Date(wo.scheduledDate) : null;
             const isInPeriod = taskDate && taskDate >= new Date(startDate) && taskDate <= new Date(new Date(endDate).setHours(23, 59, 59, 999));
             const typeMatch = selectedTypes.length === 0 || (wo.type && selectedTypes.includes(wo.type));
-
             if (isExecuted && isInPeriod && typeMatch) {
                 const equipment = equipmentData.find(e => e.id === wo.equipmentId) || {
                     id: wo.equipmentId,
-                    name: 'Desconhecido',
+                    name: 'Equipamento não localizado',
                     location: 'N/A',
                     status: 'Ativo',
-                    schedule: []
+                    schedule: [],
+                    is_critical: false
                 } as Equipment;
-
                 const task: MaintenanceTask = {
                     id: wo.id,
                     year: taskDate!.getFullYear(),
@@ -219,16 +192,17 @@ export const ReportsPage: React.FC = () => {
                     type: wo.type,
                     description: wo.description,
                     osNumber: wo.id,
-                    maintainer: wo.manHours && wo.manHours.length > 0 ? { name: wo.manHours[0].maintainer, isExternal: false } : undefined,
                     manHours: wo.manHours ? wo.manHours.reduce((acc, curr) => acc + curr.hours, 0) : 0,
                     endDate: wo.scheduledDate,
-                    details: []
+                    details: wo.checklist || []
                 };
-
                 records.push({ task, equipment });
             }
         });
         
+        if (records.length === 0) {
+            showToast("Nenhum dado executado no período", "info");
+        }
         setGeneratedRecords(records.sort((a,b) => new Date(b.task.endDate!).getTime() - new Date(a.task.endDate!).getTime()));
     };
 
@@ -238,47 +212,58 @@ export const ReportsPage: React.FC = () => {
         setTimeout(() => {
             try {
                 generateDetailedPDF(generatedRecords, startDate, endDate);
+                showToast("PDF gerado com sucesso!", "success");
             } catch (error) {
                 console.error("Falha ao gerar PDF detalhado:", error);
-                alert(error instanceof Error ? error.message : "Ocorreu um erro ao gerar o PDF. Por favor, tente novamente.");
+                showToast(error instanceof Error ? error.message : "Erro ao gerar o PDF.", "error");
             } finally {
                 setIsPrinting(false);
             }
-        }, 50);
+        }, 100);
     };
 
     return (
-        <div className="space-y-8">
-            <Header title="Gerador de Relatórios e Análises" subtitle="Exporte relatórios detalhados ou analise os dados de falhas." />
+        <div className="space-y-8 animate-fade-in">
+            <Header 
+                title="Gerador de Relatórios e Análises" 
+                subtitle="Exporte relatórios detalhados ou analise os dados de falhas."
+                actions={
+                    <button 
+                        onClick={() => setIsSqlModalOpen(true)} 
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 text-white font-black rounded-xl text-[10px] uppercase tracking-widest shadow-lg hover:bg-slate-700 transition-all"
+                    >
+                        <WrenchIcon className="w-4 h-4"/> Ver Scripts de Instalação (SQL)
+                    </button>
+                }
+            />
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <ParetoChart title="Análise de Falhas por Categoria (Pareto)" data={paretoData} />
                 
-                {/* PDF Generator section */}
                 <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-bold mb-4">Exportar Relatório Detalhado</h3>
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium">Data de Início</label>
-                            <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 w-full form-input" />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-slate-400">Início</label>
+                                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="mt-1 w-full form-input" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold uppercase text-slate-400">Fim</label>
+                                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 w-full form-input" />
+                            </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium">Data de Fim</label>
-                            <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="mt-1 w-full form-input" />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium">Tipos de Manutenção</label>
+                            <label className="block text-xs font-bold uppercase text-slate-400">Tipos de Manutenção</label>
                             <select multiple value={selectedTypes} onChange={e => setSelectedTypes(Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value))} className="mt-1 w-full form-input h-24">
                                 {Object.values(MaintenanceType).map(type => <option key={type} value={type}>{type}</option>)}
                             </select>
-                            <p className="text-xs text-gray-500 mt-1">Obs: Este filtro afeta apenas a geração do PDF, não o gráfico.</p>
                         </div>
                          <div>
-                            <label className="block text-sm font-medium">Equipamentos</label>
+                            <label className="block text-xs font-bold uppercase text-slate-400">Equipamentos</label>
                              <select multiple value={selectedEquipmentIds} onChange={e => setSelectedEquipmentIds(Array.from(e.target.selectedOptions, (option: HTMLOptionElement) => option.value))} className="mt-1 w-full form-input h-32">
                                 {equipmentData.map(eq => <option key={eq.id} value={eq.id}>{eq.id} - {eq.name}</option>)}
                              </select>
-                             <p className="text-xs text-gray-500 mt-1">Deixe em branco para todos. Segure Ctrl (ou Cmd) para selecionar múltiplos.</p>
                         </div>
                     </div>
                      <div className="mt-6 flex justify-end gap-3">
@@ -309,19 +294,21 @@ export const ReportsPage: React.FC = () => {
                             <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                                 {generatedRecords.length > 0 ? generatedRecords.map((rec, i) => (
                                     <tr key={i}>
-                                        <td className="px-4 py-4 text-sm whitespace-nowrap">{new Date(rec.task.endDate!).toLocaleDateString('pt-BR')}</td>
-                                        <td className="px-4 py-4 text-sm">{rec.equipment.name}</td>
+                                        <td className="px-4 py-4 text-sm whitespace-nowrap">{rec.task.endDate ? new Date(rec.task.endDate).toLocaleDateString('pt-BR') : 'N/A'}</td>
+                                        <td className="px-4 py-4 text-sm">{rec.equipment?.name || 'N/A'}</td>
                                         <td className="px-4 py-4 text-sm">{rec.task.type}</td>
                                         <td className="px-4 py-4 text-sm truncate max-w-sm" title={rec.task.description}>{rec.task.description}</td>
                                     </tr>
                                 )) : (
-                                    <tr><td colSpan={4} className="text-center py-10 text-gray-500">Nenhum registro encontrado.</td></tr>
+                                    <tr><td colSpan={4} className="text-center py-10 text-gray-500">Nenhum registro encontrado no período selecionado.</td></tr>
                                 )}
                             </tbody>
                         </table>
                     </div>
                 </div>
             )}
+
+            {isSqlModalOpen && <DatabaseScriptsModal isOpen={isSqlModalOpen} onClose={() => setIsSqlModalOpen(false)} />}
         </div>
     );
 };

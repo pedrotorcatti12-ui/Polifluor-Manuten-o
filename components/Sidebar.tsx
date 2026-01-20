@@ -7,165 +7,158 @@ import {
     SettingsIcon, UsersIcon, InventoryIcon, PackageIcon, ClipboardListIcon,
     ScheduleIcon, HomeIcon, ChartIcon, ShieldCheckIcon, SearchIcon,
     WrenchIcon, InfoIcon, DocumentTextIcon, ShoppingCartIcon, RefreshIcon,
-    TargetIcon
+    TargetIcon, ChevronRightIcon, ChevronLeftIcon, DownloadIcon
 } from './icons';
 
-interface NavItemProps {
-  icon: React.ReactNode;
-  label: string;
-  page: Page;
-  onClick: (e: React.MouseEvent) => void;
-  isPriority?: boolean;
-  badge?: string | number;
-  isCollapsed?: boolean;
-}
+// Componente NavItem Estilizado Polifluor
+const NavItem: React.FC<{
+    icon: React.ReactNode;
+    label: string;
+    page: Page;
+    onClick: () => void;
+    isActive: boolean;
+    isCollapsed: boolean;
+    badge?: number;
+}> = ({ icon, label, page, onClick, isActive, isCollapsed, badge }) => {
+    
+    return (
+        <li className="relative group">
+            <button
+                onClick={onClick}
+                className={`flex items-center w-full p-3 mb-1 transition-all duration-200 rounded-lg border-l-4
+                ${isActive 
+                    ? `bg-slate-50 border-[#D32F2F] text-[#D32F2F]` // Ativo: Borda vermelha esquerda, fundo cinza claro
+                    : 'border-transparent text-slate-500 hover:bg-slate-50 hover:text-slate-900' // Inativo
+                }
+                ${isCollapsed ? 'justify-center pl-0 border-l-0' : ''}`}
+            >
+                <div className={`flex-shrink-0 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}>
+                    {React.isValidElement(icon) && React.cloneElement(icon as React.ReactElement<any>, { 
+                        className: `w-5 h-5 ${isActive ? 'text-[#D32F2F]' : 'text-slate-400 group-hover:text-slate-600'}` 
+                    })}
+                </div>
 
-const NavItem: React.FC<NavItemProps> = ({ icon, label, page, onClick, isPriority, badge, isCollapsed }) => {
-  const { currentPage, setCurrentPage } = useAppContext();
-  const isActive = currentPage === page;
-  
-  const handleClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setCurrentPage(page);
-      onClick(e);
-  };
-  
-  return (
-    <li>
-      <button
-        onClick={handleClick}
-        className={`group flex items-center justify-between w-full px-4 py-3 text-sm font-black transition-all duration-300 rounded-2xl mb-1 relative overflow-hidden ${
-          isActive
-            ? isPriority 
-                ? 'bg-blue-600 text-white shadow-xl shadow-blue-200' 
-                : 'bg-slate-900 text-white shadow-md'
-            : isPriority 
-                ? 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100' 
-                : 'text-slate-500 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-gray-800'
-        } ${isCollapsed ? 'justify-center px-0' : ''}`}
-        title={isCollapsed ? label : undefined}
-      >
-        {isActive && !isPriority && (
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-full my-3" />
-        )}
-        
-        <div className="flex items-center">
-            <div className={`w-5 h-5 transition-transform duration-300 group-hover:scale-110 ${isActive ? 'scale-110' : ''} ${!isCollapsed ? 'mr-3' : ''}`}>{icon}</div>
-            {!isCollapsed && <span className="whitespace-nowrap uppercase tracking-tighter text-xs">{label}</span>}
-        </div>
-        
-        {!isCollapsed && badge !== undefined && badge !== 0 && (
-            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${isActive ? 'bg-white text-blue-600' : 'bg-rose-500 text-white shadow-sm'}`}>
-                {badge}
-            </span>
-        )}
-        {isCollapsed && badge !== undefined && badge !== 0 && (
-            <div className="absolute top-2 right-2 w-2.5 h-2.5 bg-rose-600 rounded-full border-2 border-white shadow-sm"></div>
-        )}
-      </button>
-    </li>
-  );
+                {!isCollapsed && (
+                    <span className={`ml-3 text-xs font-bold tracking-tight truncate flex-1 text-left ${isActive ? 'text-slate-900' : ''}`}>
+                        {label}
+                    </span>
+                )}
+
+                {!isCollapsed && badge && badge > 0 ? (
+                    <span className="ml-auto bg-[#D32F2F] text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                        {badge}
+                    </span>
+                ) : null}
+
+                {isCollapsed && badge && badge > 0 ? (
+                    <span className="absolute top-2 right-2 w-2 h-2 bg-[#D32F2F] rounded-full border border-white"></span>
+                ) : null}
+            </button>
+
+            {/* Tooltip */}
+            {isCollapsed && (
+                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-2 bg-slate-900 text-white text-xs font-bold rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50 whitespace-nowrap">
+                    {label}
+                </div>
+            )}
+        </li>
+    );
 };
 
-const NavGroup: React.FC<{ title: string, children: React.ReactNode, sub?: string, isCollapsed?: boolean }> = ({ title, children, sub, isCollapsed }) => (
-    <div className="mt-8">
-        {!isCollapsed && (
-            <div className="px-4 mb-3">
-                <h3 className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">{title}</h3>
-                {sub && <p className="text-[8px] font-bold text-slate-300 uppercase tracking-tighter">{sub}</p>}
-            </div>
-        )}
-        {isCollapsed && <div className="mx-auto w-8 border-t border-slate-100 dark:border-gray-800 mb-4" />}
-        <ul className="space-y-1">
-            {children}
-        </ul>
-    </div>
-);
+const SectionHeader: React.FC<{ title: string; isCollapsed: boolean }> = ({ title, isCollapsed }) => {
+    if (isCollapsed) return <div className="h-px bg-slate-200 my-4 mx-4"></div>;
+    return (
+        <h3 className="px-4 mt-6 mb-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+            {title}
+        </h3>
+    );
+};
 
 interface SidebarProps {
-    onCloseMobile?: () => void;
-    isCollapsed?: boolean;
+    isCollapsed: boolean;
+    onToggle: () => void;
+    onCloseMobile: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile, isCollapsed }) => {
-  const { setCurrentPage } = useAppContext();
-  const { workOrders } = useDataContext();
-  
-  const delayedCount = useMemo(() => 
-    workOrders.filter(o => o.status === MaintenanceStatus.Delayed).length, 
-  [workOrders]);
+export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, onCloseMobile }) => {
+    const { currentPage, setCurrentPage } = useAppContext();
+    const { workOrders } = useDataContext();
 
-  const handleNavClick = (e: React.MouseEvent) => {
-      if (onCloseMobile) onCloseMobile();
-  };
+    const delayedCount = useMemo(() => 
+        workOrders.filter(o => o.status === MaintenanceStatus.Delayed).length, 
+    [workOrders]);
 
-  return (
-    <aside className="w-full h-full flex flex-col no-print overflow-hidden select-none">
-      {/* BRAND HEADER */}
-      <div 
-        className={`flex items-center h-24 border-b border-slate-50 dark:border-gray-800 bg-white transition-all cursor-pointer hover:bg-slate-50 ${isCollapsed ? 'justify-center' : 'px-6'}`} 
-        onClick={(e) => { e.stopPropagation(); setCurrentPage('home'); if(onCloseMobile) onCloseMobile(); }}
-      >
-         <div className="p-2.5 bg-blue-600 rounded-xl shadow-lg shadow-blue-100 flex-shrink-0 transform -rotate-3 group-hover:rotate-0 transition-transform">
-            <WrenchIcon className="h-6 w-6 text-white" />
-         </div>
-         {!isCollapsed && (
-             <div className="ml-3 overflow-hidden animate-fade-in">
-                 <span className="block text-xl font-black text-slate-900 dark:text-white tracking-tighter leading-none">SGMI 2.0</span>
-                 <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Unidade Polifluor</span>
-             </div>
-         )}
-      </div>
+    const handleNav = (page: Page) => {
+        setCurrentPage(page);
+        if (window.innerWidth < 768) onCloseMobile();
+    };
 
-      <nav className="flex-1 px-3 py-6 overflow-y-auto custom-scrollbar overflow-x-hidden">
-        
-        <div className="mb-2">
-            <NavItem icon={<HomeIcon />} label="Dashboard Principal" page="home" onClick={handleNavClick} isCollapsed={isCollapsed} />
-        </div>
+    return (
+        <aside className="flex flex-col h-full bg-white border-r border-slate-200 select-none">
+            {/* BRAND AREA */}
+            <div className={`flex items-center h-20 border-b border-slate-100 transition-all ${isCollapsed ? 'justify-center px-0' : 'px-6'}`}>
+                <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="w-10 h-10 bg-[#D32F2F] rounded-md flex items-center justify-center text-white shadow-md flex-shrink-0">
+                        <span className="font-black italic text-xs">PF</span>
+                    </div>
+                    {!isCollapsed && (
+                        <div className="animate-fade-in min-w-[120px]">
+                            <h1 className="text-lg font-black text-slate-900 leading-none tracking-tighter italic">POLIFLUOR</h1>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">SGMI 2.0</p>
+                        </div>
+                    )}
+                </div>
+            </div>
 
-        <div className={`mt-8 transition-all ${!isCollapsed ? 'p-3 rounded-[2rem] bg-slate-50 dark:bg-gray-800/50 border border-slate-100 dark:border-gray-700' : ''}`}>
-             {!isCollapsed && (
-                 <div className="px-3 mb-4 flex items-center gap-2 animate-fade-in">
-                    <TargetIcon className="w-4 h-4 text-blue-600" />
-                    <h3 className="text-[10px] font-black uppercase text-blue-600 tracking-widest">Célula de Controle</h3>
-                 </div>
-             )}
-             <ul className="space-y-1">
-                <NavItem icon={<ClipboardListIcon />} label="Zona de Combate" page="work_orders" onClick={handleNavClick} isPriority badge={delayedCount} isCollapsed={isCollapsed} />
-                <NavItem icon={<ScheduleIcon />} label="Visão Estratégica" page="schedule" onClick={handleNavClick} isPriority isCollapsed={isCollapsed} />
-                <NavItem icon={<ChartIcon />} label="Termômetro Fábrica" page="dashboard" onClick={handleNavClick} isPriority isCollapsed={isCollapsed} />
-             </ul>
-        </div>
+            {/* NAV SCROLLABLE */}
+            <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-3 custom-scrollbar">
+                
+                <ul className="space-y-0.5">
+                    <NavItem icon={<HomeIcon />} label="Visão Geral" page="home" onClick={() => handleNav('home')} isActive={currentPage === 'home'} isCollapsed={isCollapsed} />
+                    <NavItem icon={<ChartIcon />} label="Dashboard KPI" page="dashboard" onClick={() => handleNav('dashboard')} isActive={currentPage === 'dashboard'} isCollapsed={isCollapsed} />
+                </ul>
 
-        <NavGroup title="Operação Diária" sub="Gestão de Suprimentos" isCollapsed={isCollapsed}>
-            <NavItem icon={<ShoppingCartIcon />} label="Compras / Peças" page="purchasing" onClick={handleNavClick} isCollapsed={isCollapsed} />
-            <NavItem icon={<InventoryIcon />} label="Almoxarifado" page="inventory" onClick={handleNavClick} isCollapsed={isCollapsed} />
-        </NavGroup>
+                <SectionHeader title="Operacional" isCollapsed={isCollapsed} />
+                <ul className="space-y-0.5">
+                    <NavItem icon={<ClipboardListIcon />} label="Ordens de Serviço" page="work_orders" onClick={() => handleNav('work_orders')} isActive={currentPage === 'work_orders'} isCollapsed={isCollapsed} badge={delayedCount} />
+                    <NavItem icon={<TargetIcon />} label="Centro de Trabalho" page="work_center" onClick={() => handleNav('work_center')} isActive={currentPage === 'work_center'} isCollapsed={isCollapsed} />
+                    <NavItem icon={<ScheduleIcon />} label="Cronograma Mestre" page="schedule" onClick={() => handleNav('schedule')} isActive={currentPage === 'schedule'} isCollapsed={isCollapsed} />
+                </ul>
 
-        <NavGroup title="Engenharia de Ativos" sub="Configuração e Fichas" isCollapsed={isCollapsed}>
-            <NavItem icon={<PackageIcon />} label="Fichas das Máquinas" page="equipment" onClick={handleNavClick} isCollapsed={isCollapsed} />
-            <NavItem icon={<RefreshIcon />} label="Auditoria Estoque" page="inventory_logs" onClick={handleNavClick} isCollapsed={isCollapsed} />
-        </NavGroup>
+                <SectionHeader title="Gestão de Ativos" isCollapsed={isCollapsed} />
+                <ul className="space-y-0.5">
+                    <NavItem icon={<PackageIcon />} label="Equipamentos" page="equipment" onClick={() => handleNav('equipment')} isActive={currentPage === 'equipment'} isCollapsed={isCollapsed} />
+                    <NavItem icon={<WrenchIcon />} label="Tipos de Equipamento" page="equipment_types" onClick={() => handleNav('equipment_types')} isActive={currentPage === 'equipment_types'} isCollapsed={isCollapsed} />
+                    <NavItem icon={<InventoryIcon />} label="Estoque / Peças" page="inventory" onClick={() => handleNav('inventory')} isActive={currentPage === 'inventory'} isCollapsed={isCollapsed} />
+                    <NavItem icon={<ShoppingCartIcon />} label="Compras" page="purchasing" onClick={() => handleNav('purchasing')} isActive={currentPage === 'purchasing'} isCollapsed={isCollapsed} />
+                </ul>
 
-        <NavGroup title="Business Intelligence" sub="Compliance IATF 16949" isCollapsed={isCollapsed}>
-            <NavItem icon={<TargetIcon />} label="BI Avançado" page="advanced_reports" onClick={handleNavClick} isCollapsed={isCollapsed} />
-            <NavItem icon={<ShieldCheckIcon />} label="Governança IATF" page="quality" onClick={handleNavClick} isCollapsed={isCollapsed} />
-            <NavItem icon={<SearchIcon />} label="Busca Mestra O.S." page="search_os" onClick={handleNavClick} isCollapsed={isCollapsed} />
-            <NavItem icon={<DocumentTextIcon />} label="Central Docs" page="documentation" onClick={handleNavClick} isCollapsed={isCollapsed} />
-        </NavGroup>
-      </nav>
+                <SectionHeader title="Qualidade & Reports" isCollapsed={isCollapsed} />
+                <ul className="space-y-0.5">
+                    <NavItem icon={<ShieldCheckIcon />} label="Conformidade IATF" page="quality" onClick={() => handleNav('quality')} isActive={currentPage === 'quality'} isCollapsed={isCollapsed} />
+                    <NavItem icon={<SearchIcon />} label="Busca Mestra" page="search_os" onClick={() => handleNav('search_os')} isActive={currentPage === 'search_os'} isCollapsed={isCollapsed} />
+                    <NavItem icon={<ChartIcon />} label="Relatórios Avançados" page="advanced_reports" onClick={() => handleNav('advanced_reports')} isActive={currentPage === 'advanced_reports'} isCollapsed={isCollapsed} />
+                     <NavItem icon={<TargetIcon />} label="Relatório Gerencial" page="managerial_report" onClick={() => handleNav('managerial_report')} isActive={currentPage === 'managerial_report'} isCollapsed={isCollapsed} />
+                     <NavItem icon={<DownloadIcon />} label="Exportar Dados" page="reports" onClick={() => handleNav('reports')} isActive={currentPage === 'reports'} isCollapsed={isCollapsed} />
+                </ul>
 
-      {/* FOOTER NAV */}
-      <div className={`p-4 border-t border-slate-50 dark:border-gray-800 ${isCollapsed ? 'flex justify-center' : ''}`}>
-         <button 
-            onClick={(e) => { e.stopPropagation(); setCurrentPage('settings'); handleNavClick(e); }}
-            className={`flex items-center w-full py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-blue-600 transition-colors ${isCollapsed ? 'justify-center' : 'px-4'}`}
-            title={isCollapsed ? 'Configurações' : undefined}
-         >
-            <SettingsIcon className={`w-4 h-4 ${!isCollapsed ? 'mr-3' : ''}`} />
-            {!isCollapsed && 'Configurações'}
-         </button>
-      </div>
-    </aside>
-  );
+                <SectionHeader title="Sistema" isCollapsed={isCollapsed} />
+                <ul className="space-y-0.5">
+                    <NavItem icon={<SettingsIcon />} label="Configurações" page="settings" onClick={() => handleNav('settings')} isActive={currentPage === 'settings'} isCollapsed={isCollapsed} />
+                    <NavItem icon={<DocumentTextIcon />} label="Documentação" page="documentation" onClick={() => handleNav('documentation')} isActive={currentPage === 'documentation'} isCollapsed={isCollapsed} />
+                     <NavItem icon={<InfoIcon />} label="Sobre o SGMI" page="information" onClick={() => handleNav('information')} isActive={currentPage === 'information'} isCollapsed={isCollapsed} />
+                </ul>
+            </nav>
+
+            {/* FOOTER TOGGLE */}
+            <div className="p-4 border-t border-slate-100">
+                <button 
+                    onClick={onToggle}
+                    className="flex items-center justify-center w-full py-2 bg-slate-50 text-slate-400 hover:text-[#D32F2F] hover:bg-red-50 rounded-lg transition-colors"
+                >
+                    {isCollapsed ? <ChevronRightIcon className="w-5 h-5" /> : <ChevronLeftIcon className="w-5 h-5" />}
+                </button>
+            </div>
+        </aside>
+    );
 };

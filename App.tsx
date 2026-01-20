@@ -22,6 +22,9 @@ import { QualityPage } from './pages/QualityPage';
 import { InformationPage } from './pages/InformationPage';
 import { DocumentationPage } from './pages/DocumentationPage';
 import { PurchasingPage } from './pages/PurchasingPage';
+import { EquipmentTypesPage } from './pages/EquipmentTypesPage';
+import { ManagerialReportPage } from './pages/ManagerialReportPage';
+import { ReportsPage } from './pages/ReportsPage';
 
 // Import Components
 import { AppHeader } from './components/AppHeader';
@@ -36,7 +39,7 @@ const AppContent: React.FC = () => {
     const { equipmentData, workOrders, inventoryData, maintainers, requesters, handleUnifiedSave } = useDataContext();
     const { showToast } = useToast();
     
-    // isSidebarOpen: true = Expandida (256px), false = Mini (80px)
+    // isSidebarOpen: true = Expandida (260px), false = Mini (72px)
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isCorrectiveRequestOpen, setIsCorrectiveRequestOpen] = useState(false);
 
@@ -45,9 +48,11 @@ const AppContent: React.FC = () => {
         else document.documentElement.classList.remove('dark');
     }, [theme]);
 
-    // Auto-hide ao navegar para garantir foco no conteúdo
+    // Em telas pequenas, fecha a sidebar ao mudar de página
     useEffect(() => {
-        setIsSidebarOpen(false);
+        if (window.innerWidth < 768) {
+            setIsSidebarOpen(false);
+        }
     }, [currentPage]);
     
     const handleSaveUnifiedOS = (updatedOrder: WorkOrder) => {
@@ -84,9 +89,9 @@ const AppContent: React.FC = () => {
         setIsSidebarOpen(prev => !prev);
     }, []);
 
+    // Fecha sidebar se clicar no conteúdo principal em mobile
     const handleMainContentClick = () => {
-        // Se a sidebar estiver expandida e o usuário clicar na área principal, recolhe.
-        if (isSidebarOpen) {
+        if (window.innerWidth < 768 && isSidebarOpen) {
             setIsSidebarOpen(false);
         }
     };
@@ -109,6 +114,9 @@ const AppContent: React.FC = () => {
             case 'information': return <InformationPage />;
             case 'documentation': return <DocumentationPage />;
             case 'settings': return <SettingsPage />;
+            case 'equipment_types': return <EquipmentTypesPage />;
+            case 'managerial_report': return <ManagerialReportPage />;
+            case 'reports': return <ReportsPage />;
             default: return <HomePage />;
         }
     };
@@ -117,21 +125,21 @@ const AppContent: React.FC = () => {
     
     return (
         <div className={`min-h-screen font-sans ${theme === 'dark' ? 'dark' : ''} flex overflow-hidden`}>
-            {/* Sidebar Reativa: Clique para expandir */}
+            {/* Sidebar Fixa */}
             <div 
-                className={`fixed inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out transform bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-gray-800 shadow-2xl 
-                ${isSidebarOpen ? 'translate-x-0 w-64' : 'translate-x-0 w-20'}`}
-                onClick={() => !isSidebarOpen && setIsSidebarOpen(true)}
+                className={`fixed inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-gray-800 shadow-xl
+                ${isSidebarOpen ? 'w-64' : 'w-[72px]'}`}
             >
                 <Sidebar 
                     isCollapsed={!isSidebarOpen} 
+                    onToggle={toggleSidebar}
                     onCloseMobile={() => setIsSidebarOpen(false)} 
                 />
             </div>
 
-            {/* Main Content: Clique para recolher */}
+            {/* Main Content */}
             <main 
-                className={`flex-1 flex flex-col h-screen overflow-hidden bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-white transition-all duration-300 ${isSidebarOpen ? 'pl-64' : 'pl-20'}`}
+                className={`flex-1 flex flex-col h-screen overflow-hidden bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-white transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-[72px]'}`}
                 onClick={handleMainContentClick}
             >
                 <AppHeader 

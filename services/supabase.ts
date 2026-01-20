@@ -1,8 +1,10 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 // No ambiente de execução, process.env mapeia as variáveis do .env
-const supabaseUrl = process.env.SUPABASE_URL || '';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
+// Fallback para valores hardcoded caso o process.env não esteja populado
+const supabaseUrl = process.env.SUPABASE_URL || 'https://nzmkmmeencnhlumegman.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56bWttbWVlbmNuaGx1bWVnbWFuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg3NzQxNDAsImV4cCI6MjA4NDM1MDE0MH0.YSWCzHxlYafcYoCj4R-PNrVfoIE_8T6JHctu6fzKECM';
 
 if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Supabase environment variables are missing. Check your .env file.");
@@ -20,7 +22,7 @@ export const fetchFromCloud = async (tableName: string) => {
         .select('*');
     
     if (error) {
-        console.error(`Error fetching ${tableName}:`, error);
+        console.error(`Error fetching ${tableName}:`, error.message, error.details);
         return [];
     }
     return data || [];
@@ -36,7 +38,7 @@ export const upsertToCloud = async (tableName: string, record: any) => {
         .select();
 
     if (error) {
-        console.error(`Error upserting to ${tableName}:`, error);
+        console.error(`Error upserting to ${tableName}:`, error.message);
         return { success: false, error };
     }
     return { success: true, data };

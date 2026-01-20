@@ -2,11 +2,13 @@
 import React, { useState, useMemo } from 'react';
 import { WorkOrder, MaintenanceStatus, MaintenanceType } from '../types';
 import { Header } from '../components/Header';
-import { PlusIcon, EditIcon, TargetIcon } from '../components/icons';
+import { PlusIcon, EditIcon, TargetIcon, DocumentTextIcon, CheckCircleIcon, DeleteIcon } from '../components/icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { useAppContext } from '../contexts/AppContext';
 import { useDataContext } from '../contexts/DataContext';
 import { MAINTENANCE_TYPE_CONFIG, MONTHS } from '../constants';
+import { PreviewWorkOrderModal } from '../components/PreviewWorkOrderModal';
+import { ConfirmationModal } from '../components/ConfirmationModal';
 
 const StatusQuickFilter: React.FC<{ label: string; count: number; active: boolean; color: string; onClick: () => void }> = ({ label, count, active, color, onClick }) => (
     <button onClick={onClick} className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border-2 transition-all ${active ? color + ' border-current shadow-sm scale-105 z-10' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}>
@@ -17,16 +19,20 @@ const StatusQuickFilter: React.FC<{ label: string; count: number; active: boolea
 
 export const WorkOrderPage: React.FC = () => {
     const { setIsOSModalOpen, setEditingOrder } = useAppContext();
-    const { workOrders, equipmentData, excludedIds } = useDataContext();
+    const { workOrders, equipmentData, excludedIds, handleUnifiedSave, setWorkOrders, showToast } = useDataContext();
     
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('Todos');
     const [filterNature, setFilterNature] = useState<'TODAS' | 'PREVENTIVAS' | 'PREDITIVAS' | 'CORRETIVAS'>('TODAS');
+    
+    // Modal de Impressão Individual
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewTask, setPreviewTask] = useState<any>(null);
+    const [deletingOrder, setDeletingOrder] = useState<WorkOrder | null>(null);
 
     const debouncedSearchTerm = useDebounce(searchTerm, 300);
     const equipmentMap = useMemo(() => new Map(equipmentData.map(e => [e.id, e])), [equipmentData]);
 
-    // Combine issued Work Orders with Scheduled Tasks from the Master Plan
     const unifiedList = useMemo(() => {
         // 1. Issued Orders
         const issued = workOrders.map(wo => ({...wo, isVirtual: false}));
@@ -37,10 +43,8 @@ export const WorkOrderPage: React.FC = () => {
         
         equipmentData.forEach(eq => {
             eq.schedule.forEach(task => {
-                // Skip if this task ID or OS number matches an existing issued order
                 if (issuedIds.has(task.id) || (task.osNumber && issuedIds.has(task.osNumber))) return;
 
-                // Create a virtual work order for display
                 const virtualOrder: WorkOrder & { isVirtual: boolean } = {
                     id: task.osNumber || 'PLAN',
                     equipmentId: eq.id,
@@ -84,15 +88,48 @@ export const WorkOrderPage: React.FC = () => {
                 return matchesStatus && matchesSearch;
             })
             .sort((a, b) => {
-                // Sort by ID (descending) but handle 'PLAN' IDs
                 if (a.id === 'PLAN' && b.id !== 'PLAN') return 1;
                 if (a.id !== 'PLAN' && b.id === 'PLAN') return -1;
                 return String(b.id).localeCompare(String(a.id), undefined, { numeric: true });
             });
     }, [unifiedList, debouncedSearchTerm, filterStatus, filterNature, equipmentMap, excludedIds]);
 
+    const handlePrint = (order: WorkOrder) => {
+        const eq = equipmentMap.get(order.equipmentId);
+        if (!eq) return;
+        
+        // Mock de FlatTask para o preview
+        const taskData = {
+            equipment: eq,
+            task: {
+                id: order.id,
+                year: new Date(order.scheduledDate).getFullYear(),
+                month: MONTHS[new Date(order.scheduledDate).getMonth()],
+                status: order.status,
+                type: order.type,
+                description: order.description,
+                osNumber: order.id,
+                details: order.checklist
+            },
+            year: new Date(order.scheduledDate).getFullYear(),
+            monthIndex: new Date(order.scheduledDate).getMonth(),
+            key: order.id
+        };
+        
+        setPreviewTask(taskData);
+        setIsPreviewOpen(true);
+    };
+
+    const handleDelete = async () => {
+        if (!deletingOrder) return;
+        // Simples remoção da lista em memória local, em produção seria via API
+        setWorkOrders(prev => prev.filter(o => o.id !== deletingOrder.id));
+        setDeletingOrder(null);
+        showToast("Ordem de serviço excluída", "info");
+    };
+
     return (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-6 animate-fade-in pb-20">
             <Header title="Protocolos de Manutenção" subtitle="Visão unificada: Ordens Emitidas + Cronograma Mestre." 
                 actions={
                     <button onClick={() => { setEditingOrder(null); setIsOSModalOpen(true); }} className="px-6 py-3 bg-blue-600 text-white font-black rounded-xl shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2 text-xs uppercase tracking-widest">
@@ -158,14 +195,26 @@ export const WorkOrderPage: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-2">
-                                            {isVirtual ? (
-                                                <button onClick={() => { setEditingOrder(item); setIsOSModalOpen(true); }} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Emitir O.S. a partir do Plano">
-                                                    <EditIcon />
-                                                </button>
-                                            ) : (
-                                                <button onClick={() => { setEditingOrder(item); setIsOSModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar O.S.">
-                                                    <EditIcon />
+                                        <div className="flex justify-end gap-1">
+                                            {!isVirtual && (
+                                                <>
+                                                    <button onClick={() => { setEditingOrder(item); setIsOSModalOpen(true); }} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Editar">
+                                                        <EditIcon className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => handlePrint(item)} className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all" title="Imprimir">
+                                                        <DocumentTextIcon className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => { setEditingOrder(item); setIsOSModalOpen(true); }} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all" title="Baixar / Concluir">
+                                                        <CheckCircleIcon className="w-4 h-4" />
+                                                    </button>
+                                                    <button onClick={() => setDeletingOrder(item)} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all" title="Excluir">
+                                                        <DeleteIcon className="w-4 h-4" />
+                                                    </button>
+                                                </>
+                                            )}
+                                            {isVirtual && (
+                                                <button onClick={() => { setEditingOrder(item); setIsOSModalOpen(true); }} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Emitir O.S.">
+                                                    <EditIcon className="w-4 h-4" />
                                                 </button>
                                             )}
                                         </div>
@@ -176,6 +225,20 @@ export const WorkOrderPage: React.FC = () => {
                     </tbody>
                 </table>
             </div>
+
+            {isPreviewOpen && previewTask && (
+                <PreviewWorkOrderModal isOpen={isPreviewOpen} onClose={() => setIsPreviewOpen(false)} taskData={previewTask} />
+            )}
+
+            {deletingOrder && (
+                <ConfirmationModal 
+                    isOpen={!!deletingOrder}
+                    onClose={() => setDeletingOrder(null)}
+                    onConfirm={handleDelete}
+                    title="Excluir Protocolo"
+                    message={`Deseja excluir permanentemente a O.S. #${deletingOrder.id}? Esta ação não pode ser desfeita.`}
+                />
+            )}
         </div>
     );
 };

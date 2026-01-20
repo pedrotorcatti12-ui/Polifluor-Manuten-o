@@ -22,11 +22,13 @@ export const SettingsPage: React.FC = () => {
         maintainers, setMaintainers,
         requesters, setRequesters,
         equipmentTypes, setEquipmentTypes,
+        handleEquipmentTypeSave, handleEquipmentTypeDelete,
         equipmentData,
         workOrders,
         syncData,
         logActivity,
-        isSyncing
+        isSyncing,
+        showToast
     } = useDataContext();
 
     const [activeTab, setActiveTab] = useState<MasterDataType>('maintainers');
@@ -48,7 +50,7 @@ export const SettingsPage: React.FC = () => {
         return 0;
     };
 
-    const handleRemove = (item: string, type: MasterDataType) => {
+    const handleRemove = async (item: string, type: MasterDataType) => {
         const count = getUsageCount(item, type);
         if (count > 0) {
             alert(`BLOQUEIO DE INTEGRIDADE: Não é possível excluir "${item}" pois existem ${count} registros vinculados.`);
@@ -58,7 +60,10 @@ export const SettingsPage: React.FC = () => {
         if (confirm(`Deseja remover "${item}" permanentemente?`)) {
             if (type === 'maintainers') setMaintainers(prev => prev.filter(i => i !== item));
             if (type === 'requesters') setRequesters(prev => prev.filter(i => i !== item));
-            if (type === 'equipment_types') setEquipmentTypes(prev => prev.filter(i => i.id !== item));
+            if (type === 'equipment_types') {
+                const success = await handleEquipmentTypeDelete(item);
+                if(success) showToast("Tipo excluído", "info");
+            }
             
             logActivity({
                 action_type: 'UPDATE_STATUS',
@@ -67,7 +72,7 @@ export const SettingsPage: React.FC = () => {
         }
     };
 
-    const handleSaveInline = (oldValue: string, type: MasterDataType) => {
+    const handleSaveInline = async (oldValue: string, type: MasterDataType) => {
         if (!editValue.trim() || editValue === oldValue) {
             setEditingId(null);
             return;
@@ -75,11 +80,19 @@ export const SettingsPage: React.FC = () => {
 
         if (type === 'maintainers') setMaintainers(prev => prev.map(i => i === oldValue ? editValue : i));
         if (type === 'requesters') setRequesters(prev => prev.map(i => i === oldValue ? editValue : i));
+        if (type === 'equipment_types') {
+            // Para equipment_types, a edição de ID/Descrição é mais complexa pois é PK.
+            // Aqui estamos editando a Descrição, mantendo o ID.
+            const existing = equipmentTypes.find(t => t.id === oldValue);
+            if(existing) {
+                await handleEquipmentTypeSave({ ...existing, description: editValue });
+            }
+        }
         
         setEditingId(null);
     };
 
-    const handleAddItem = () => {
+    const handleAddItem = async () => {
         const val = searchTerm.trim();
         if (!val) return;
 
@@ -87,7 +100,7 @@ export const SettingsPage: React.FC = () => {
         if (activeTab === 'requesters') setRequesters(prev => [...prev, val]);
         if (activeTab === 'equipment_types') {
             const id = val.toUpperCase().replace(/\s+/g, '_');
-            setEquipmentTypes(prev => [...prev, { id, description: val }]);
+            await handleEquipmentTypeSave({ id, description: val });
         }
 
         setSearchTerm('');
@@ -218,14 +231,12 @@ export const SettingsPage: React.FC = () => {
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {activeTab !== 'equipment_types' && (
-                                                <button 
-                                                    onClick={() => { setEditingId(id); setEditValue(label); }}
-                                                    className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                                                >
-                                                    <EditIcon className="w-4 h-4"/>
-                                                </button>
-                                            )}
+                                            <button 
+                                                onClick={() => { setEditingId(id); setEditValue(label); }}
+                                                className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
+                                            >
+                                                <EditIcon className="w-4 h-4"/>
+                                            </button>
                                             <button 
                                                 onClick={() => handleRemove(id, activeTab)}
                                                 className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-lg"

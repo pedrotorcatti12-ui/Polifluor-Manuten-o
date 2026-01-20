@@ -15,7 +15,7 @@ import { MONTHS } from '../constants';
 import { getNextOSNumber } from '../utils/osGenerator';
 
 export const EquipmentPage: React.FC = () => {
-  const { equipmentData, workOrders, equipmentTypes, maintenancePlans, setMaintenancePlans, handleEquipmentSave, syncData, showToast } = useDataContext();
+  const { equipmentData, workOrders, equipmentTypes, maintenancePlans, handleEquipmentSave, handlePlanSave, handlePlanDelete, showToast } = useDataContext();
   const [searchTerm, setSearchTerm] = useState('');
   
   const [isEquipmentModalOpen, setIsEquipmentModalOpen] = useState(false);
@@ -47,11 +47,9 @@ export const EquipmentPage: React.FC = () => {
     }
   };
   
-  const handleSavePlan = async (plan: MaintenancePlan) => {
-      setMaintenancePlans(prev => {
-          const exists = prev.some(p => p.id === plan.id);
-          return exists ? prev.map(p => p.id === plan.id ? plan : p) : [...prev, plan];
-      });
+  const onSavePlan = async (plan: MaintenancePlan) => {
+      const success = await handlePlanSave(plan);
+      if (!success) return;
 
       if (plan.target_equipment_ids && plan.target_equipment_ids.length > 0) {
           const targetYear = 2026;
@@ -93,6 +91,15 @@ export const EquipmentPage: React.FC = () => {
       }
 
       closePlanModal();
+  };
+
+  const onDeletePlan = async () => {
+      if (!deletingPlan) return;
+      const success = await handlePlanDelete(deletingPlan.id);
+      if (success) {
+          setDeletingPlan(null);
+          showToast("Plano excluído", "info");
+      }
   };
 
   const openEquipmentModal = (equipment: Equipment | null = null) => {
@@ -186,7 +193,7 @@ export const EquipmentPage: React.FC = () => {
           <MaintenancePlanModal
             isOpen={isPlanModalOpen}
             onClose={closePlanModal}
-            onSave={handleSavePlan}
+            onSave={onSavePlan}
             existingPlan={editingPlan}
             equipmentTypes={equipmentTypes}
           />
@@ -195,7 +202,7 @@ export const EquipmentPage: React.FC = () => {
           <ConfirmationModal
             isOpen={!!deletingPlan}
             onClose={() => setDeletingPlan(null)}
-            onConfirm={() => setMaintenancePlans(prev => prev.filter(p => p.id !== deletingPlan!.id))}
+            onConfirm={onDeletePlan}
             title="Excluir Plano"
             message={`Tem certeza que deseja excluir o plano "${deletingPlan.description}"?`}
           />

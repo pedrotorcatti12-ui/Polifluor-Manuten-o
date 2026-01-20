@@ -19,7 +19,6 @@ export enum MaintenanceType {
     Predictive = 'Preditiva',
     Corrective = 'Corretiva',
     Overhaul = 'Revisão Geral',
-    // Added missing types referenced in constants and components
     RevisaoPeriodica = 'Revisão Periódica',
     PrestacaoServicos = 'Prestação de Serviços',
     Predial = 'Predial',
@@ -70,7 +69,6 @@ export interface MaintenanceTask {
   manHours?: number;
   planId?: string;
   isPrepared?: boolean;
-  // Added missing fields for Corrective logic
   correctiveCategory?: CorrectiveCategory;
   rootCause?: string;
   requestDate?: string;
@@ -90,7 +88,6 @@ export interface Equipment {
   schedule: MaintenanceTask[];
   manufacturer?: string;
   model?: string;
-  // Added missing fields for Equipment modals
   yearOfManufacture?: string | number;
   preservationNotes?: string;
   customerSpecificRequirements?: string;
@@ -117,13 +114,14 @@ export interface WorkOrder {
     requester: string;
     machineStopped: boolean;
     rootCause?: string;
-    // Added missing fields for unified logic
     observations?: string;
     miscNotes?: string;
     downtimeNotes?: string;
     correctiveCategory?: CorrectiveCategory;
     isPrepared?: boolean;
     purchaseRequests?: PurchaseRequest[];
+    failureTime?: string;
+    restorationTime?: string;
 }
 
 export interface SparePart {
@@ -134,17 +132,20 @@ export interface SparePart {
   cost: number;
   minStock: number;
   currentStock: number;
+  // Campos FO 044
+  avgConsumption?: number;
+  leadTime?: number;
 }
 
 export interface StockMovement {
     id: string;
     partId: string;
-    partName: string; // Added missing field
+    partName: string;
     quantity: number;
-    type: 'Entrada' | 'Saída';
+    type: 'Entrada' | 'Saída' | 'Ajuste';
     reason: string;
     userName: string;
-    user: string; // Added missing field used in logs
+    user: string;
     date: string;
     workOrderId?: string;
 }
@@ -188,7 +189,7 @@ export interface MaintenancePlan {
     tasks: TaskDetail[];
 }
 
-export type Page = 'home' | 'dashboard' | 'work_center' | 'schedule' | 'work_orders' | 'equipment' | 'inventory' | 'inventory_logs' | 'purchasing' | 'history' | 'search_os' | 'quality' | 'information' | 'documentation' | 'settings' | 'advanced_reports';
+export type Page = 'home' | 'dashboard' | 'work_center' | 'schedule' | 'work_orders' | 'equipment' | 'inventory' | 'inventory_logs' | 'purchasing' | 'history' | 'search_os' | 'quality' | 'information' | 'documentation' | 'settings' | 'advanced_reports' | 'equipment_types' | 'managerial_report' | 'reports';
 export type Theme = 'light' | 'dark';
 
 export interface ReliabilityMetrics {

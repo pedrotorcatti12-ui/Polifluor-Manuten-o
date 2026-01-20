@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { Header } from '../components/Header';
 import { EquipmentType } from '../types';
@@ -8,7 +9,7 @@ import { useDataContext } from '../contexts/DataContext';
 import { useDebounce } from '../hooks/useDebounce';
 
 export const EquipmentTypesPage: React.FC = () => {
-    const { equipmentTypes, setEquipmentTypes, equipmentData } = useDataContext();
+    const { equipmentTypes, handleEquipmentTypeSave, handleEquipmentTypeDelete, equipmentData, showToast } = useDataContext();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingType, setEditingType] = useState<EquipmentType | null>(null);
     const [deletingType, setDeletingType] = useState<EquipmentType | null>(null);
@@ -37,31 +38,37 @@ export const EquipmentTypesPage: React.FC = () => {
         setIsModalOpen(false);
     };
 
-    const handleSave = (type: EquipmentType) => {
-        if (editingType) {
-            setEquipmentTypes(prev => prev.map(t => t.id === type.id ? type : t));
-        } else {
+    const handleSave = async (type: EquipmentType) => {
+        let typeToSave = type;
+        if (!editingType) {
             const newId = type.description.toUpperCase().replace(/\s+/g, '_');
             if (equipmentTypes.some(t => t.id === newId)) {
-                alert(`Erro: O ID gerado "${newId}" já existe. Por favor, escolha uma descrição diferente.`);
+                alert(`Erro: O ID gerado "${newId}" já existe.`);
                 return;
             }
-            const newType = { ...type, id: newId };
-            setEquipmentTypes(prev => [...prev, newType].sort((a,b) => a.description.localeCompare(b.description)));
+            typeToSave = { ...type, id: newId };
         }
-        closeModal();
+        
+        const success = await handleEquipmentTypeSave(typeToSave);
+        if (success) {
+            showToast("Tipo de equipamento salvo!", "success");
+            closeModal();
+        }
     };
     
-    const handleDelete = () => {
+    const handleDelete = async () => {
         if (!deletingType) return;
-        setEquipmentTypes(prev => prev.filter(t => t.id !== deletingType.id));
-        setDeletingType(null);
+        const success = await handleEquipmentTypeDelete(deletingType.id);
+        if (success) {
+            showToast("Tipo excluído com sucesso", "info");
+            setDeletingType(null);
+        }
     };
     
     const handleDeleteClick = (type: EquipmentType) => {
         const isInUse = equipmentData.some(eq => eq.model === type.id);
         if (isInUse) {
-            alert(`Não é possível excluir o tipo "${type.description}" pois ele está sendo utilizado por um ou mais equipamentos. Altere o tipo dos equipamentos antes de excluir.`);
+            alert(`Não é possível excluir o tipo "${type.description}" pois ele está sendo utilizado por um ou mais equipamentos.`);
             return;
         }
         setDeletingType(type);

@@ -1,0 +1,26 @@
+
+@import url('https://rsms.me/inter/inter.css');
+
+:root {
+    --brand-primary: #D32F2F;
+    --brand-dark: #B71C1C;
+    --bg-main: #F8FAFC;
+}
+
+html { font-family: 'Inter', sans-serif; background-color: var(--bg-main); }
+
+.bg-brand { background-color: var(--brand-primary); }
+.text-brand { color: var(--brand-primary); }
+
+.animate-fade-in {
+    animation: fadeIn 0.4s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.form-input {
+    @apply border-slate-200 rounded-xl focus:ring-[#D32F2F] focus:border-[#D32F2F] font-bold text-sm;
+}

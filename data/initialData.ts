@@ -1,181 +1,101 @@
 
-import { Equipment, MaintenanceStatus, MaintenanceType, MaintenanceTask, AssetCategory, TaskDetail, WorkOrder } from '../types';
-import { MONTHS } from '../constants';
-
-// --- 1. ESTRATÉGIAS TÉCNICAS ---
-const STRATEGIES: { [key: string]: { freq: number, desc: string, type: MaintenanceType, tasks: TaskDetail[] } } = {
-    'PH': { 
-        freq: 3, 
-        desc: 'Revisão Trimestral - Hidráulica', 
-        type: MaintenanceType.Preventive,
-        tasks: [
-            { action: 'Verificar nível de óleo (ISO VG 68)', checked: false },
-            { action: 'Inspecionar vazamentos no pistão/mangueiras', checked: false },
-            { action: 'Reaperto de estrutura e colunas', checked: false },
-            { action: 'Verificar sensores de segurança/cortina', checked: false },
-            { action: 'Limpeza do trocador de calor', checked: false },
-            { action: 'Monitorar pressão de trabalho', checked: false }
-        ]
-    },
-    'EX': { 
-        freq: 3, 
-        desc: 'Revisão Trimestral - Extrusão', 
-        type: MaintenanceType.Preventive,
-        tasks: [
-            { action: 'Verificar Resistências e Termopares', checked: false },
-            { action: 'Medição de corrente do motor principal', checked: false },
-            { action: 'Verificar vazamentos no redutor', checked: false },
-            { action: 'Limpeza de ventoinhas do painel', checked: false }
-        ]
-    },
-    'AEX': { 
-        freq: 3, 
-        desc: 'Revisão Trimestral - Extrusora PA', 
-        type: MaintenanceType.Preventive,
-        tasks: [
-            { action: 'Verificar Resistências e Estrutura Física', checked: false },
-            { action: 'Verificar nível de óleo redutor', checked: false },
-            { action: 'Verificar cilindro hidráulico', checked: false }
-        ]
-    },
-    'FO': { 
-        freq: 3, 
-        desc: 'Revisão Trimestral - Forno Elétrico', 
-        type: MaintenanceType.Preventive,
-        tasks: [
-            { action: 'Reaperto de contatos elétricos', checked: false },
-            { action: 'Medição de corrente das resistências', checked: false },
-            { action: 'Verificar vedação da porta', checked: false },
-            { action: 'Verificar estrutura física e tubulação', checked: false } 
-        ]
-    },
-    'ES': { 
-        freq: 1, 
-        desc: 'Revisão Mensal - Segurança e Abrasivos', 
-        type: MaintenanceType.Preventive,
-        tasks: [
-            { action: 'Verificar estado dos rebolos (trincas)', checked: false },
-            { action: 'Ajustar apoio de peça (máx 3mm)', checked: false },
-            { action: 'Verificar proteção visual (METÁLICA)', checked: false }, 
-            { action: 'Teste de isolamento elétrico', checked: false }
-        ]
-    },
-    'GE': {
-        freq: 12,
-        desc: 'Revisão Anual - Grupo Gerador',
-        type: MaintenanceType.Preventive,
-        tasks: [
-            { action: 'Substituição de Óleo e Filtro (Filtro: 1518512)', checked: false },
-            { action: 'Verificar Filtro de Combustível e Separador', checked: false },
-            { action: 'Verificar nível de combustível (Diesel)', checked: false },
-            { action: 'Teste de carga e bateria', checked: false }
-        ]
-    },
-    'CF': {
-        freq: 1, 
-        desc: 'Revisão Mensal - Refrigeração',
-        type: MaintenanceType.Preventive,
-        tasks: [
-            { action: 'Limpeza da grade do ar condicionado', checked: false }, 
-            { action: 'Verificação de temperatura', checked: false }
-        ]
-    },
-    'MS': { 
-        freq: 2, 
-        desc: 'Revisão Bimestral - Solda', 
-        type: MaintenanceType.Preventive, 
-        tasks: [
-            { action: 'VERIFICAR ASPECTO VISUAL', checked: false },
-            { action: 'VERIFICAR INSTALAÇÃO ELÉTRICA', checked: false },
-            { action: 'EXECUTAR LIMPEZA INTERNA COM SOPRADOR DE AR', checked: false }
-        ] 
-    },
-};
-
-// --- 2. LISTA MESTRA ---
-const MASTER_PLAN_2026 = [
-    { id: 'PH-20', name: 'PRENSA HIDRAULICA', startMonth: 0 },
-    { id: 'PH-19', name: 'PRENSA HIDRAULICA', startMonth: 0 },
-    { id: 'PH-09', name: 'PRENSA DE MOLDAGEM', startMonth: 0 },
-    { id: 'AEX-02', name: 'EXTRUSORA DE PA', startMonth: 0 },
-    { id: 'CF-01', name: 'CÂMARA FRIA', startMonth: 0 },
-    { id: 'PH-15', name: 'PRENSA HIDRÁULICA', startMonth: 0 },
-    { id: 'EX-03', name: 'EXTRUSORA', startMonth: 2 },
-    { id: 'PH-13', name: 'PRENSA HIDRAULICA', startMonth: 0 },
-    { id: 'FO-10', name: 'FORNO', startMonth: 2 },
-    { id: 'PH-14', name: 'PRENSA', startMonth: 0 },
-    { id: 'FO-11', name: 'FORNO', startMonth: 2 },
-    { id: 'EX-04', name: 'EXTRUSORA', startMonth: 0 },
-    { id: 'FO-07', name: 'FORNO', startMonth: 2 },
-    { id: 'MS-03', name: 'MAQUINA DE SOLDA', startMonth: 0 },
-    { id: 'TD-04', name: 'TRANÇADEIRA', startMonth: 0 },
-    { id: 'TD-02', name: 'TRANÇADEIRA', startMonth: 0 },
-    { id: 'ES-01', name: 'ESMERIL', startMonth: 0 },
-    { id: 'ES-04', name: 'ESMERIL', startMonth: 0 },
-    { id: 'GE-01', name: 'GERADOR', startMonth: 7 },
-    { id: 'AF-01', name: 'AUTOFRETAGEM', startMonth: 10, type: MaintenanceType.Predictive },
-];
-
-const getChecklistFor = (id: string) => {
-    const prefix = id.match(/^([A-Z]+)/)?.[1] || 'GENERIC';
-    return STRATEGIES[prefix]?.tasks || [];
-};
-
-// --- 3. DADOS REAIS EXECUTADOS JANEIRO (FIXADO PARA BI) ---
-const REAL_EXECUTED_JANUARY: WorkOrder[] = [
-    { id: '0179', equipmentId: 'PH-20', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-09T11:10:00', endDate: '2026-01-09T11:45:00', requester: 'PCM', description: 'Revisão Trimestral', machineStopped: true, manHours: [{maintainer: 'Darci', hours: 0.58}], materialsUsed: [] },
-    { id: '0183', equipmentId: 'PH-19', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-09T10:10:00', endDate: '2026-01-09T11:00:00', requester: 'PCM', description: 'Revisão Trimestral', machineStopped: true, manHours: [{maintainer: 'Darci', hours: 0.83}], materialsUsed: [] },
-    { id: '0187', equipmentId: 'PH-09', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-09T08:30:00', endDate: '2026-01-09T09:10:00', requester: 'PCM', description: 'Revisão Trimestral', machineStopped: true, manHours: [{maintainer: 'Darci', hours: 0.67}], materialsUsed: [] },
-    { id: '0030', equipmentId: 'AEX-02', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-08T11:30:00', endDate: '2026-01-08T12:30:00', requester: 'PCM', description: 'Revisão Trimestral', machineStopped: true, manHours: [{maintainer: 'Darci', hours: 1.0}], materialsUsed: [] },
-    { id: '0006', equipmentId: 'CF-01', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-08T07:30:00', endDate: '2026-01-08T08:10:00', requester: 'PCM', description: 'Revisão Mensal', machineStopped: false, manHours: [{maintainer: 'Darci', hours: 0.67}], materialsUsed: [] },
-    { id: '0127', equipmentId: 'PH-15', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-07T16:00:00', endDate: '2026-01-07T16:40:00', requester: 'PCM', description: 'Revisão Trimestral', machineStopped: true, manHours: [{maintainer: 'Darci', hours: 0.67}], materialsUsed: [] },
-    { id: 'C-0103', equipmentId: 'PH-13', type: MaintenanceType.Corrective, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-09T12:10:00', endDate: '2026-01-09T13:40:00', requester: 'Produção', description: 'Vazamento Pistão Central', machineStopped: true, manHours: [{maintainer: 'Darci', hours: 1.5}], materialsUsed: [] },
-    { id: '0067', equipmentId: 'FO-10', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-08T08:15:00', endDate: '2026-01-08T08:50:00', requester: 'PCM', description: 'Revisão Trimestral', machineStopped: true, manHours: [{maintainer: 'Darci', hours: 0.58}], materialsUsed: [] },
-    { id: '0025', equipmentId: 'PH-14', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-08T15:00:00', endDate: '2026-01-08T15:40:00', requester: 'PCM', description: 'Revisão Trimestral', machineStopped: true, manHours: [{maintainer: 'Darci', hours: 0.67}], materialsUsed: [] },
-    { id: '0019', equipmentId: 'MS-03', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-08T16:30:00', endDate: '2026-01-08T17:00:00', requester: 'PCM', description: 'Revisão Bimestral', machineStopped: false, manHours: [{maintainer: 'Darci', hours: 0.5}], materialsUsed: [] },
-    { id: '0007', equipmentId: 'ES-01', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-08T11:00:00', endDate: '2026-01-08T11:15:00', requester: 'PCM', description: 'Revisão Mensal', machineStopped: false, manHours: [{maintainer: 'Darci', hours: 0.25}], materialsUsed: [] },
-    { id: '0009', equipmentId: 'ES-04', type: MaintenanceType.Preventive, status: MaintenanceStatus.Executed, scheduledDate: '2026-01-08T15:00:00', endDate: '2026-01-08T15:20:00', requester: 'PCM', description: 'Revisão Mensal', machineStopped: false, manHours: [{maintainer: 'Darci', hours: 0.33}], materialsUsed: [] },
-].map(wo => ({
-    ...wo,
-    checklist: getChecklistFor(wo.equipmentId)
-}));
+import { Equipment, MaintenanceStatus, MaintenanceType, AssetCategory, WorkOrder } from '../types';
 
 export const getInitialEquipmentData = (): Equipment[] => {
-    return MASTER_PLAN_2026.map(raw => {
-        const prefix = raw.id.match(/^([A-Z]+)/)?.[1] || 'GENERIC';
-        const strategy = STRATEGIES[prefix] || { freq: 12, desc: 'Padrão', type: MaintenanceType.Preventive, tasks: [] };
-        
-        const schedule: MaintenanceTask[] = [];
-        // Gerar cronograma futuro mantendo espaço para as OS já executadas
-        for (let i = 0; i < 12; i += strategy.freq) {
-            const hasExecuted = REAL_EXECUTED_JANUARY.find(o => o.equipmentId === raw.id && new Date(o.scheduledDate).getMonth() === i);
-            if (!hasExecuted) {
-                schedule.push({
-                    id: crypto.randomUUID(),
-                    year: 2026,
-                    month: MONTHS[i],
-                    status: MaintenanceStatus.Scheduled,
-                    type: strategy.type,
-                    description: strategy.desc,
-                    details: strategy.tasks
-                });
-            }
-        }
+    const rawList = [
+        // PÁGINA 1
+        { id: 'PH-15', name: 'PRENSA HIDRÁULICA', local: 'MOLDAGEM', critical: true },
+        { id: 'CF-01', name: 'CÂMARA FRIA', local: 'EXTRUSÃO', critical: false },
+        { id: 'TB-01', name: 'TAMBOREADOR', local: 'USINAGEM', critical: false },
+        { id: 'FO-10', name: 'FORNO', local: 'GERAL', critical: true },
+        { id: 'TA-01', name: 'TORNO AUTOMÁTICO', local: 'USINAGEM', critical: false },
+        { id: 'TA-02', name: 'TORNO AUTOMÁTICO', local: 'USINAGEM', critical: false },
+        { id: 'AF-01', name: 'AUTOFRETAGEM', local: 'AUTOMOTIVO', critical: false },
+        { id: 'FO-09', name: 'FORNO ELÉTRICO', local: 'GERAL', critical: true },
+        { id: 'TD-02', name: 'TRANÇADEIRA', local: 'TRANÇADEIRA', critical: true },
+        { id: 'FO-11', name: 'FORNO', local: 'GERAL', critical: true },
+        { id: 'FO-12', name: 'FORNO', local: 'GERAL', critical: true },
+        { id: 'TRID-01', name: 'TRIDIMENSIONAL', local: 'SALA QUALIDADE', critical: false },
+        { id: 'TF-01', name: 'TREFILA', local: 'TREFILA', critical: false },
+        { id: 'ES-01', name: 'ESMERIL', local: 'GERAL', critical: false },
+        { id: 'SF-03', name: 'SERRA DE FITA', local: 'GERAL', critical: false },
+        { id: 'EX-01', name: 'EXTRUSORA', local: 'EXTRUSÃO', critical: true },
+        { id: 'AEX-01', name: 'EXTRUSORA DE PA', local: 'AUTOMOTIVO', critical: true },
+        { id: 'AEX-02', name: 'EXTRUSORA DE PA', local: 'AUTOMOTIVO', critical: true },
+        { id: 'MI-04', name: 'MISTURADOR', local: 'GERAL', critical: false },
+        { id: 'EX-02', name: 'EXTRUSORA', local: 'EXTRUSÃO', critical: true },
+        { id: 'EX-03', name: 'EXTRUSORA', local: 'EXTRUSÃO', critical: true },
+        { id: 'TA-03', name: 'TORNO AUTOMÁTICO', local: 'USINAGEM', critical: false },
+        { id: 'FO-13', name: 'FORNO', local: 'GERAL', critical: true },
+        { id: 'TF-02', name: 'TREFILA', local: 'TREFILA', critical: false },
+        { id: 'FO-08', name: 'FORNO', local: 'GERAL', critical: true },
+        { id: 'ES-04', name: 'ESMERIL', local: 'GERAL', critical: false },
+        { id: 'TC-01', name: 'TORNO CNC', local: 'USINAGEM', critical: false },
+        { id: 'TC-02', name: 'TORNO CNC', local: 'USINAGEM', critical: false },
+        { id: 'TC-03', name: 'TORNO CNC', local: 'USINAGEM', critical: false },
+        { id: 'TC-04', name: 'TORNO CNC', local: 'USINAGEM', critical: false },
+        { id: 'JT-01', name: 'JATO DE GRANALHA', local: 'TUBULAÇÃO', critical: false },
+        { id: 'TC-05', name: 'TORNO CNC', local: 'USINAGEM', critical: false },
+        { id: 'TC-06', name: 'TORNO CNC', local: 'USINAGEM', critical: false },
+        { id: 'TC-07', name: 'TORNO CNC', local: 'USINAGEM', critical: false },
+        { id: 'TC-08', name: 'TORNO CNC', local: 'USINAGEM', critical: false },
+        { id: 'JT-02', name: 'JATO DE OXIDO DE ALUMINIO', local: 'TUBULAÇÃO', critical: false },
+        { id: 'EX-05', name: 'EXTRUSORA', local: 'EXTRUSÃO', critical: true },
+        { id: 'EP-02', name: 'ESPULADEIRA', local: 'TRANÇADEIRA', critical: false },
+        { id: 'FO-01', name: 'ESTUFA ELETRICA', local: 'GERAL', critical: true },
+        { id: 'FO-02', name: 'ESTUFA ELETRICA', local: 'GERAL', critical: true },
+        { id: 'FO-03', name: 'FORNO', local: 'GERAL', critical: true },
+        { id: 'PH-01', name: 'PRENSA HIDRÁULICA', local: 'MOLDAGEM', critical: true },
+        { id: 'PH-02', name: 'PRENSA DE MOLDAGEM', local: 'MOLDAGEM', critical: true },
+        { id: 'TD-01', name: 'TRANÇADEIRA', local: 'TRANÇADEIRA', critical: false },
+        { id: 'SF-01', name: 'SERRA', local: 'GERAL', critical: false },
+        // PÁGINA 2
+        { id: 'EX-04', name: 'EXTRUSORA', local: 'EXTRUSÃO', critical: true },
+        { id: 'PH-20', name: 'PRENSA HIDRAULICA', local: 'MOLDAGEM', critical: true },
+        { id: 'PH-05', name: 'PRENSA DE EIXO EXCENTRICO', local: 'MOLDAGEM', critical: true },
+        { id: 'CT-01', name: 'CENTRO DE USINAGEM', local: 'USINAGEM', critical: false },
+        { id: 'CO-01', name: 'COMPRESSOR CHICAGO', local: 'SALA DE MAQUINA', critical: true },
+        { id: 'CS-01', name: 'CABINE SECUNDARIA', local: 'SALA DE MAQUINA', critical: true },
+        { id: 'CPR-01', name: 'CABINE PRIMARIA', local: 'SALA DE MAQUINA', critical: true },
+        { id: 'QDF-01', name: 'QUADRO DE FORÇA', local: 'GERAL', critical: false },
+        { id: 'SI-01', name: 'SOLDA POR INDUÇÃO', local: 'AUTOMOTIVO', critical: false },
+        { id: 'CH01', name: 'CHILLER', local: 'AUTOMOTIVO', critical: false },
+        { id: 'CO-02', name: 'COMPRESSOR DE PARAFUSO', local: 'SALA DE MAQUINA', critical: true },
+        { id: 'CO-03', name: 'COMPRESSOR PISTÃO SCHULZ', local: 'SALA DE MAQUINA', critical: true },
+        // PÁGINA 3
+        { id: 'GE-01', name: 'GERADOR', local: 'SALA DE MAQUINA', critical: true },
+        { id: 'TRA-01', name: 'TORRE DE RESFRIAMENTO', local: 'EXTRUSÃO', critical: false },
+        { id: 'EX-06', name: 'EXTRUSORA RAM', local: 'EXTRUSÃO', critical: true },
+        { id: 'EX-07', name: 'EXTRUSORA RAM', local: 'EXTRUSÃO', critical: true },
+        { id: 'GUI-01', name: 'GUILHOTINA', local: 'AUTOMOTIVO', critical: false },
+        { id: 'SF-04', name: 'SERRA DE FITA', local: 'SOLDA', critical: false },
+    ];
 
-        return {
-            id: raw.id,
-            name: raw.name,
-            location: 'Planta Principal',
-            category: AssetCategory.Industrial,
-            status: 'Ativo',
-            is_critical: ['PH', 'EX', 'AEX', 'FO', 'GE'].includes(prefix), 
-            manufacturer: 'Global Tech',
-            model: prefix,
-            schedule: schedule
-        };
-    });
+    return rawList.map(item => ({
+        id: item.id,
+        name: item.name,
+        location: item.local,
+        category: item.id.startsWith('QE') || item.id.startsWith('BEB') || item.id.startsWith('QI') ? AssetCategory.Facility : AssetCategory.Industrial,
+        status: 'Ativo',
+        is_critical: item.critical,
+        schedule: []
+    }));
 };
 
-export const getInitialCorrectiveBacklog = (): WorkOrder[] => {
-    return [...REAL_EXECUTED_JANUARY];
+export const getReservedIATFOrders = (): WorkOrder[] => {
+    const ids = ['0127', '0006', '0067', '0230', '0075', '0007', '0303', '0043', '0009', '0115', '0147', '0011', '0055', '0179', '0013', '0019', '0025', '0183', '0187', '0250', '0001'];
+    return ids.map(id => ({
+        id,
+        equipmentId: 'VÁRIOS (LOTE)',
+        type: MaintenanceType.Preventive,
+        status: MaintenanceStatus.Executed,
+        scheduledDate: '2026-01-07T13:25:00Z',
+        endDate: '2026-01-07T17:00:00Z',
+        description: 'Lote Retornado de Campo - Protocolo IATF 16949',
+        requester: 'Gestão Manutenção',
+        machineStopped: false,
+        manHours: [{ maintainer: 'Equipe Interna', hours: 2 }],
+        materialsUsed: [],
+        observations: 'Protocolo digital de rastreabilidade do lote de 21 unidades.'
+    }));
 };
