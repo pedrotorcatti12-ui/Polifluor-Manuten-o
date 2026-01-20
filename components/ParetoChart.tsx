@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 
 interface ParetoChartProps {
@@ -35,7 +34,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({ title, data }) => {
 
   const maxCount = Math.max(...chartData.map(d => d.count), 1);
 
-  // Caminho da linha de Pareto (0 a 100)
+  // Caminho da linha de Pareto (coordenadas 0-100 no viewBox)
   const linePath = chartData.map((d, i, arr) => {
     const x = (i + 0.5) * (100 / arr.length);
     const y = 100 - d.cumulativePercentage;
@@ -88,13 +87,22 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({ title, data }) => {
             {chartData.map((d, i, arr) => {
               const x = (i + 0.5) * (100 / arr.length);
               const y = 100 - d.cumulativePercentage;
-              return <circle key={i} cx={x} cy={y} r="1.5" fill="#ef4444" className="stroke-white stroke-[0.5]" />;
+              return (
+                <circle 
+                  key={i} 
+                  cx={x} 
+                  cy={y} 
+                  r="1.5" 
+                  fill="#ef4444" 
+                  className="stroke-white dark:stroke-gray-800 stroke-[0.5]" 
+                />
+              );
             })}
           </svg>
         </div>
       </div>
 
-      {/* Eixo X - Categorias */}
+      {/* Eixo X - Categorias (Truncado para legibilidade) */}
       <div className="flex mt-4 gap-1">
         {chartData.map((item, idx) => (
           <div key={idx} className="flex-1 text-center truncate text-[8px] font-black text-slate-400 uppercase" title={item.category}>
@@ -107,7 +115,7 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({ title, data }) => {
       <div className="mt-10 flex justify-center items-center gap-8">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 bg-blue-600 rounded-sm"></div>
-          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Frequência (80%)</span>
+          <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Frequência</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-6 h-0.5 bg-red-500"></div>
@@ -117,3 +125,5 @@ export const ParetoChart: React.FC<ParetoChartProps> = ({ title, data }) => {
     </div>
   );
 };
+
+export default ParetoChart;
