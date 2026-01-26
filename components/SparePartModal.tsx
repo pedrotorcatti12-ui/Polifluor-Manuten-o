@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+// FIX: Add missing imports
 import { SparePart } from '../types';
 import { CloseIcon, LightBulbIcon, CheckCircleIcon } from './icons';
 

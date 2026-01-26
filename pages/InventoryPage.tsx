@@ -1,17 +1,47 @@
 import React, { useState, useMemo } from 'react';
+// FIX: Add missing imports
 import { SparePart } from '../types';
 import { Header } from '../components/Header';
 import { useDebounce } from '../hooks/useDebounce';
-import { PlusIcon, EditIcon, DeleteIcon, ClipboardListIcon, ChevronDownIcon, PackageIcon, ShieldCheckIcon, SearchIcon, RefreshIcon, DocumentTextIcon, CheckCircleIcon } from '../components/icons';
+import { PlusIcon, EditIcon, DeleteIcon, ClipboardListIcon, ChevronDownIcon, PackageIcon, ShieldCheckIcon, SearchIcon, RefreshIcon, DocumentTextIcon, CheckCircleIcon, WrenchIcon } from '../components/icons';
 import { StockStatusBadge } from '../components/StockStatusBadge';
 import { SparePartModal } from '../components/SparePartModal';
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { useDataContext } from '../contexts/DataContext';
+import { useAppContext } from '../contexts/AppContext';
 
 declare const window: any;
 
+const StockLevelBar: React.FC<{ current: number; min: number }> = ({ current, min }) => {
+    const max = min > 0 ? min * 2 : current * 2 || 1; // Define um teto visual
+    const percentage = Math.min((current / max) * 100, 100);
+    const minPercentage = (min / max) * 100;
+
+    let barColor = 'bg-emerald-500';
+    if (current < min) barColor = 'bg-rose-500';
+    else if (current === min) barColor = 'bg-amber-500';
+
+    return (
+        <div className="w-full bg-slate-200 rounded-full h-2.5 relative">
+            <div 
+                className={`h-2.5 rounded-full ${barColor} transition-all duration-500`} 
+                style={{ width: `${percentage}%` }}
+            ></div>
+            {min > 0 && (
+                <div 
+                    className="absolute top-0 h-full w-0.5 bg-slate-600/50" 
+                    style={{ left: `${minPercentage}%` }}
+                    title={`Mínimo: ${min}`}
+                ></div>
+            )}
+        </div>
+    );
+};
+
 export const InventoryPage: React.FC = () => {
+  // FIX: Destructure missing properties from context
   const { inventoryData, handlePartSave, handleInventoryAdjustment } = useDataContext();
+  const { userRole } = useAppContext();
   const [searchTerm, setSearchTerm] = useState('');
   const [isPartModalOpen, setIsPartModalOpen] = useState(false);
   const [editingPart, setEditingPart] = useState<SparePart | null>(null);
@@ -20,6 +50,8 @@ export const InventoryPage: React.FC = () => {
   const [adjustPartId, setAdjustPartId] = useState('');
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjustReason, setAdjustReason] = useState('Contagem Cíclica');
+  
+  const isAdmin = userRole === 'admin';
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
@@ -31,6 +63,10 @@ export const InventoryPage: React.FC = () => {
       part.location.toLowerCase().includes(term)
     ).sort((a, b) => a.name.localeCompare(b.name));
   }, [inventoryData, debouncedSearchTerm]);
+
+  const totalItemsCount = useMemo(() => 
+    inventoryData.reduce((sum, part) => sum + (part.currentStock || 0), 0),
+  [inventoryData]);
 
   const handleSavePart = async (part: SparePart) => {
       await handlePartSave(part);
@@ -45,60 +81,14 @@ export const InventoryPage: React.FC = () => {
           setAdjustPartId('');
       }
   };
-
-  const generateMonthlyReport = () => {
-      if (typeof window.jspdf === 'undefined') {
-          alert("Biblioteca PDF carregando..."); 
-          return;
-      }
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      
-      doc.setFontSize(18);
-      doc.text("Relatório Mensal de Estoque - FO 044", 105, 20, { align: 'center' });
-      doc.setFontSize(10);
-      doc.text(`Data Base: ${new Date().toLocaleDateString()}`, 105, 28, { align: 'center' });
-
-      const tableData = inventoryData.map(p => [
-          p.id, p.name, p.location, `${p.currentStock} ${p.unit}`, `${p.minStock} ${p.unit}`, 
-          (p.currentStock < p.minStock ? 'CRÍTICO' : 'OK')
-      ]);
-
-      // Use the global autoTable function properly
-      if (typeof (doc as any).autoTable !== 'function') {
-          alert("Erro: Plugin de tabela não carregado.");
-          return;
-      }
-
-      (doc as any).autoTable({
-          startY: 35,
-          head: [['Cód', 'Descrição', 'Local', 'Atual', 'Mínimo', 'Status']],
-          body: tableData,
-          theme: 'grid',
-          styles: { fontSize: 8 },
-          headStyles: { fillColor: [41, 128, 185] }
-      });
-
-      const finalY = (doc as any).lastAutoTable.finalY + 30;
-      doc.line(20, finalY, 100, finalY);
-      doc.text("Gestor da Manutenção", 20, finalY + 5);
-      
-      doc.line(110, finalY, 190, finalY);
-      doc.text("Gerência Industrial / Auditoria", 110, finalY + 5);
-
-      doc.save(`Estoque_Mensal_${new Date().getMonth()+1}_${new Date().getFullYear()}.pdf`);
-  };
   
   return (
     <div className="space-y-6 animate-fade-in">
       <Header 
         title="Almoxarifado Técnico (FO-044)" 
         subtitle="Controle físico-financeiro com baixa automática via O.S."
-        actions={
+        actions={ isAdmin && (
           <div className="flex gap-2">
-              <button onClick={generateMonthlyReport} className="px-4 py-3 bg-slate-800 text-white font-black rounded-xl hover:bg-slate-700 transition-all flex items-center gap-2 text-xs uppercase tracking-widest">
-                <DocumentTextIcon className="w-4 h-4" /> Relatório Mensal
-              </button>
               <button onClick={() => setIsQuickAdjustOpen(true)} className="px-4 py-3 bg-emerald-600 text-white font-black rounded-xl hover:bg-emerald-700 transition-all flex items-center gap-2 text-xs uppercase tracking-widest">
                 <RefreshIcon className="w-4 h-4" /> Inventário Rápido
               </button>
@@ -106,7 +96,7 @@ export const InventoryPage: React.FC = () => {
                 <PlusIcon className="w-5 h-5" /> Novo Item
               </button>
           </div>
-        }
+        )}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -114,7 +104,21 @@ export const InventoryPage: React.FC = () => {
               <div className="p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-600 rounded-xl"><PackageIcon className="w-6 h-6"/></div>
               <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Abaixo do Mínimo</p>
-                  <p className="text-2xl font-black text-rose-600">{inventoryData.filter(p => p.currentStock <= p.minStock).length}</p>
+                  <p className="text-2xl font-black text-rose-600">{inventoryData.filter(p => p.currentStock < p.minStock).length}</p>
+              </div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border-2 border-slate-100 dark:border-gray-700 flex items-center gap-4">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-xl"><ClipboardListIcon className="w-6 h-6"/></div>
+              <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SKUs Cadastrados</p>
+                  <p className="text-2xl font-black">{inventoryData.length}</p>
+              </div>
+          </div>
+          <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl border-2 border-slate-100 dark:border-gray-700 flex items-center gap-4">
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 rounded-xl"><WrenchIcon className="w-6 h-6"/></div>
+              <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Quantidade Total</p>
+                  <p className="text-2xl font-black">{totalItemsCount}</p>
               </div>
           </div>
       </div>
@@ -137,27 +141,34 @@ export const InventoryPage: React.FC = () => {
           <table className="min-w-full divide-y divide-slate-100 dark:divide-gray-700">
             <thead className="bg-slate-900 text-[10px] font-black uppercase text-slate-400 tracking-widest">
               <tr>
-                <th className="px-6 py-5 text-left">Referência</th>
                 <th className="px-6 py-5 text-left">Produto</th>
-                <th className="px-6 py-5 text-center">Local</th>
-                <th className="px-6 py-5 text-center">Mínimo</th>
+                <th className="px-6 py-5 text-left w-64">Nível de Estoque</th>
+                <th className="px-6 py-5 text-center">Mín.</th>
                 <th className="px-6 py-5 text-center">Atual</th>
+                <th className="px-6 py-5 text-center">Local</th>
                 <th className="px-6 py-5 text-center">Status</th>
-                <th className="px-6 py-5 text-right">Ações</th>
+                {isAdmin && <th className="px-6 py-5 text-right">Ações</th>}
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-slate-50 dark:divide-gray-700">
               {filteredData.map(part => (
                   <tr key={part.id} className="group hover:bg-blue-50/30 transition-colors">
-                    <td className="px-6 py-4 font-mono text-xs font-black text-blue-600">{part.id}</td>
-                    <td className="px-6 py-4 font-black text-slate-800 text-sm">{part.name}</td>
-                    <td className="px-6 py-4 text-center text-xs">{part.location}</td>
-                    <td className="px-6 py-4 text-center text-xs font-mono text-slate-400">{part.minStock} {part.unit}</td>
-                    <td className="px-6 py-4 text-center font-black text-base">{part.currentStock}</td>
-                    <td className="px-6 py-4 text-center"><StockStatusBadge currentStock={part.currentStock} minStock={part.minStock} /></td>
-                    <td className="px-6 py-4 text-right">
-                        <button onClick={() => { setEditingPart(part); setIsPartModalOpen(true); }} className="text-blue-600 hover:bg-blue-50 p-2 rounded"><EditIcon className="w-4 h-4"/></button>
+                    <td className="px-6 py-4">
+                        <p className="font-black text-slate-800 text-sm">{part.name}</p>
+                        <p className="font-mono text-xs font-bold text-blue-600">{part.id}</p>
                     </td>
+                    <td className="px-6 py-4">
+                        <StockLevelBar current={part.currentStock ?? 0} min={part.minStock ?? 0} />
+                    </td>
+                    <td className="px-6 py-4 text-center text-xs font-mono text-slate-400">{part.minStock ?? 0} {part.unit}</td>
+                    <td className="px-6 py-4 text-center font-black text-base">{part.currentStock ?? 0} <span className="text-xs font-normal text-slate-400">{part.unit}</span></td>
+                    <td className="px-6 py-4 text-center text-xs">{part.location}</td>
+                    <td className="px-6 py-4 text-center"><StockStatusBadge currentStock={part.currentStock ?? 0} minStock={part.minStock ?? 0} /></td>
+                    {isAdmin && (
+                        <td className="px-6 py-4 text-right">
+                            <button onClick={() => { setEditingPart(part); setIsPartModalOpen(true); }} className="text-blue-600 hover:bg-blue-50 p-2 rounded"><EditIcon className="w-4 h-4"/></button>
+                        </td>
+                    )}
                   </tr>
               ))}
             </tbody>

@@ -1,9 +1,8 @@
-
 import { useCallback } from 'react';
-import { Equipment, MaintenanceStatus, MaintenanceType, WorkOrder, ReliabilityMetrics } from '../types';
+// FIX: Add missing imports
+import { Equipment, MaintenanceStatus, MaintenanceType, WorkOrder, ReliabilityMetrics, AssetCategory } from '../types';
 import { MONTHS } from '../constants';
 
-const DAILY_OPERATIONAL_HOURS = 10; 
 const MTTR_CRITICAL_TARGET = 1.0; 
 
 export interface MonthlyMetric extends ReliabilityMetrics {
@@ -18,18 +17,24 @@ export interface AdvancedReportData extends ReliabilityMetrics {
     isCritical: boolean;
     monthlyHistory: MonthlyMetric[];
     complianceStatus: 'Aprovado' | 'Reprovado';
+    globalAvailability: number;
+    totalPlannedHours: number;
 }
 
 export const useAdvancedMetrics = () => {
-    const countBusinessDays = (start: Date, end: Date) => {
-        let count = 0;
-        const cur = new Date(start.getTime());
-        while (cur <= end) {
-            const day = cur.getDay();
-            if (day !== 0 && day !== 6) count++;
-            cur.setDate(cur.getDate() + 1);
+    const calculateTotalOperationalHours = (start: Date, end: Date): number => {
+        let totalHours = 0;
+        const current = new Date(start.getTime());
+        
+        while (current <= end) {
+            const dayOfWeek = current.getDay();
+            // Seg-Sex (1-5), 10h/dia. Sábado(6) e Domingo(0) não contam.
+            if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+                totalHours += 10;
+            }
+            current.setDate(current.getDate() + 1);
         }
-        return count;
+        return totalHours;
     };
 
     const calculateMetrics = useCallback((
@@ -38,7 +43,7 @@ export const useAdvancedMetrics = () => {
         selectedIds: string[], 
         startDateStr: string, 
         endDateStr: string,
-        filterCriticidade: 'Todos' | 'Criticos' | 'Nao-Criticos' = 'Todos'
+        filterCriticidade: 'Criticos' | 'Nao-Criticos' = 'Criticos'
     ): AdvancedReportData[] => {
         
         const start = new Date(startDateStr);
@@ -46,16 +51,21 @@ export const useAdvancedMetrics = () => {
         if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
 
         return equipmentData
+            // FIX: Access category property
+            .filter(eq => eq.category !== AssetCategory.Facility) // EXCLUI PREDIAIS/UTILITÁRIOS DOS KPIS
             .filter(eq => {
                 if (!selectedIds.includes(eq.id)) return false;
-                if (filterCriticidade === 'Criticos') return eq.is_critical;
-                if (filterCriticidade === 'Nao-Criticos') return !eq.is_critical;
+                // FIX: Access isCritical property
+                if (filterCriticidade === 'Criticos') return eq.isCritical;
+                if (filterCriticidade === 'Nao-Criticos') return !eq.isCritical;
                 return true;
             })
             .map(equipment => {
                 const monthlyData = Array(12).fill(null).map(() => ({ 
                     failures: 0, 
-                    correctiveDowntime: 0 
+                    correctiveDowntime: 0,
+                    totalDowntime: 0,
+                    plannedDowntime: 0
                 }));
 
                 workOrders
@@ -67,17 +77,28 @@ export const useAdvancedMetrics = () => {
                             ? (new Date(wo.endDate).getTime() - new Date(wo.scheduledDate).getTime()) / 3600000
                             : 0;
                         
+                        monthlyData[mIdx].totalDowntime += duration;
+                        
                         if (wo.type === MaintenanceType.Corrective) {
                             monthlyData[mIdx].failures += 1;
                             monthlyData[mIdx].correctiveDowntime += duration;
+                        } else if (
+                            // FIX: Add missing MaintenanceType members
+                            wo.type === MaintenanceType.Preventive || 
+                            wo.type === MaintenanceType.RevisaoPeriodica || 
+                            wo.type === MaintenanceType.Predictive || 
+                            wo.type === MaintenanceType.Overhaul
+                        ) {
+                            monthlyData[mIdx].plannedDowntime += duration;
                         }
                     });
 
                 const monthlyHistory = MONTHS.map((name, idx) => {
                     const stats = monthlyData[idx];
-                    const lastDay = new Date(start.getFullYear(), idx + 1, 0);
-                    const bDays = countBusinessDays(new Date(start.getFullYear(), idx, 1), lastDay);
-                    const grossHours = bDays * DAILY_OPERATIONAL_HOURS;
+                    const firstDayOfMonth = new Date(start.getFullYear(), idx, 1);
+                    const lastDayOfMonth = new Date(start.getFullYear(), idx + 1, 0);
+                    
+                    const grossHours = calculateTotalOperationalHours(firstDayOfMonth, lastDayOfMonth);
                     
                     const mttr = stats.failures > 0 ? stats.correctiveDowntime / stats.failures : 0;
                     const mtbf = stats.failures > 0 ? (grossHours - stats.correctiveDowntime) / stats.failures : null;
@@ -92,18 +113,22 @@ export const useAdvancedMetrics = () => {
 
                 const totalFailures = monthlyData.reduce((a, b) => a + b.failures, 0);
                 const totalCorrectiveHours = monthlyData.reduce((a, b) => a + b.correctiveDowntime, 0);
-                const totalBDays = countBusinessDays(start, end);
-                const totalGross = totalBDays * DAILY_OPERATIONAL_HOURS;
+                const totalDowntimeHours = monthlyData.reduce((a, b) => a + b.totalDowntime, 0);
+                const totalPlannedHours = monthlyData.reduce((a, b) => a + b.plannedDowntime, 0);
+                const totalGross = calculateTotalOperationalHours(start, end);
 
                 return {
                     equipmentId: equipment.id,
                     equipmentName: equipment.name,
-                    isCritical: equipment.is_critical,
+                    // FIX: Access isCritical property
+                    isCritical: !!equipment.isCritical,
                     mttr: totalFailures > 0 ? totalCorrectiveHours / totalFailures : 0,
                     mtbf: totalFailures > 0 ? (totalGross - totalCorrectiveHours) / totalFailures : null,
                     availability: totalGross > 0 ? ((totalGross - totalCorrectiveHours) / totalGross) * 100 : 100,
+                    globalAvailability: totalGross > 0 ? ((totalGross - totalDowntimeHours) / totalGross) * 100 : 100,
                     totalFailures,
                     totalCorrectiveHours,
+                    totalPlannedHours,
                     monthlyHistory,
                     complianceStatus: (totalFailures > 0 ? totalCorrectiveHours / totalFailures : 0) <= MTTR_CRITICAL_TARGET ? 'Aprovado' : 'Reprovado'
                 };

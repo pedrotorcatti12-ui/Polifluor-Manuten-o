@@ -1,7 +1,10 @@
 
+
 import React, { useState } from 'react';
 import { MaintenancePlan, EquipmentType } from '../types';
-import { CloseIcon, EditIcon, PlusIcon, DeleteIcon } from './icons';
+import { CloseIcon, EditIcon, PlusIcon, DeleteIcon, ArrowPathIcon } from './icons';
+import { useDataContext } from '../contexts/DataContext';
+import { MONTHS } from '../constants';
 
 interface PlansListModalProps {
   isOpen: boolean;
@@ -16,32 +19,47 @@ interface PlansListModalProps {
 export const PlansListModal: React.FC<PlansListModalProps> = ({ 
     isOpen, onClose, plans, equipmentTypes, onEdit, onAdd, onDelete 
 }) => {
+  const { handleBulkReprogramPlans } = useDataContext();
   const [searchTerm, setSearchTerm] = useState('');
+  const [reprogramFromMonth, setReprogramFromMonth] = useState('Janeiro');
+  const [reprogramToMonth, setReprogramToMonth] = useState('Fevereiro');
+  const [reprogramTypeId, setReprogramTypeId] = useState('Todos');
 
   if (!isOpen) return null;
+
+  const handleBulkReprogram = () => {
+      if (reprogramFromMonth === reprogramToMonth) {
+          alert("O mês de origem e destino não podem ser os mesmos.");
+          return;
+      }
+      if (window.confirm(`Tem certeza que deseja mover todos os planos de '${reprogramFromMonth}' para '${reprogramToMonth}' para o tipo selecionado?`)) {
+          handleBulkReprogramPlans(reprogramFromMonth, reprogramToMonth, reprogramTypeId);
+      }
+  };
 
   const filteredPlans = plans.filter(p => {
     const term = searchTerm.toLowerCase();
     const description = (p.description || '').toLowerCase();
-    // Support both snake_case and camelCase property names during transition
-    const typeId = (p.equipment_type_id || (p as any).equipmentTypeId || '').toLowerCase();
+    // FIX: Correct property name from equipment_type_id to equipmentTypeId
+    const typeId = (p.equipmentTypeId || '').toLowerCase();
     
     return description.includes(term) || typeId.includes(term);
   });
 
   const getTypeName = (id: string) => {
-      const type = equipmentTypes.find(t => t.id === id);
-      return type ? type.description : id;
+    if (!id) return 'N/A';
+    const type = equipmentTypes.find(t => t.id === id);
+    return type ? type.description : id;
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-4xl p-6 m-4 relative border border-gray-200 dark:border-gray-600 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-5xl p-6 m-4 relative border border-gray-200 dark:border-gray-600 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-white">
           <CloseIcon />
         </button>
 
-        <div className="flex justify-between items-center mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
+        <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-4">
             <div>
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Planos de Manutenção</h2>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Gerencie a frequência e as tarefas padrão de cada tipo de equipamento.</p>
@@ -50,11 +68,37 @@ export const PlansListModal: React.FC<PlansListModalProps> = ({
                 <PlusIcon className="w-4 h-4" /> Novo Plano
             </button>
         </div>
+        
+        <div className="mb-4 p-4 bg-slate-50 dark:bg-gray-700/50 rounded-lg border border-slate-200 dark:border-gray-600">
+            <h3 className="text-xs font-black uppercase text-slate-500 dark:text-slate-300 mb-3 flex items-center gap-2"><ArrowPathIcon className="w-4 h-4" /> Reprogramação Rápida</h3>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                <div className="md:col-span-1">
+                    <label className="text-[10px] font-bold">Mês de Origem</label>
+                    <select value={reprogramFromMonth} onChange={e => setReprogramFromMonth(e.target.value)} className="form-input w-full text-xs">
+                        {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </div>
+                <div className="md:col-span-1">
+                    <label className="text-[10px] font-bold">Mês de Destino</label>
+                    <select value={reprogramToMonth} onChange={e => setReprogramToMonth(e.target.value)} className="form-input w-full text-xs">
+                        {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
+                    </select>
+                </div>
+                <div className="md:col-span-1">
+                    <label className="text-[10px] font-bold">Aplicar para o Tipo de Ativo</label>
+                    <select value={reprogramTypeId} onChange={e => setReprogramTypeId(e.target.value)} className="form-input w-full text-xs">
+                        <option value="Todos">Todos os Tipos</option>
+                        {equipmentTypes.map(t => <option key={t.id} value={t.id}>{t.description}</option>)}
+                    </select>
+                </div>
+                <button onClick={handleBulkReprogram} className="px-4 py-2 bg-rose-600 text-white font-bold rounded-lg text-xs hover:bg-rose-700">Reprogramar em Lote</button>
+            </div>
+        </div>
 
         <div className="mb-4">
             <input 
                 type="text" 
-                placeholder="Buscar plano..." 
+                placeholder="Buscar plano por descrição ou tipo..." 
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="w-full form-input"
@@ -67,6 +111,7 @@ export const PlansListModal: React.FC<PlansListModalProps> = ({
                     <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Descrição do Plano</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Aplica-se a (Tipo)</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mês Início</th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Frequência</th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tarefas</th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ações</th>
@@ -78,9 +123,11 @@ export const PlansListModal: React.FC<PlansListModalProps> = ({
                             <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{plan.description}</td>
                             <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                 <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-xs font-bold">
-                                    {getTypeName(plan.equipment_type_id || (plan as any).equipmentTypeId)}
+                                    {/* FIX: Correct property name from equipment_type_id to equipmentTypeId */}
+                                    {getTypeName(plan.equipmentTypeId)}
                                 </span>
                             </td>
+                            <td className="px-6 py-4 text-sm font-bold">{plan.startMonth}</td>
                             <td className="px-6 py-4 text-sm text-center">
                                 <span className="font-bold text-gray-800 dark:text-white">{plan.frequency}</span>
                                 <span className="text-gray-500 text-xs ml-1">meses</span>

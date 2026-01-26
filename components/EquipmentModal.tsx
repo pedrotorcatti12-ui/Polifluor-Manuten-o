@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+// FIX: Add missing imports for AssetCategory and HomeIcon
 import { Equipment, EquipmentType, MaintenancePlan, AssetCategory } from '../types';
 import { CloseIcon, TargetIcon, WrenchIcon, HomeIcon } from './icons';
 
@@ -19,11 +20,11 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({ isOpen, onClose,
   const [status, setStatus] = useState<'Ativo' | 'Inativo'>('Ativo');
   const [model, setModel] = useState('');
   const [yearOfManufacture, setYearOfManufacture] = useState('');
-  // FIX: Replaced non-existent isKeyEquipment with is_critical
   const [isCritical, setIsCritical] = useState(false);
   const [preservationNotes, setPreservationNotes] = useState('');
   const [customerSpecificRequirements, setCustomerSpecificRequirements] = useState('');
   const [customPlanId, setCustomPlanId] = useState('');
+  const [typeId, setTypeId] = useState('');
 
   useEffect(() => {
     if (existingEquipment) {
@@ -34,11 +35,11 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({ isOpen, onClose,
       setStatus(existingEquipment.status || 'Ativo');
       setModel(existingEquipment.model || '');
       setYearOfManufacture(String(existingEquipment.yearOfManufacture || ''));
-      // FIX: Use is_critical property
-      setIsCritical(existingEquipment.is_critical || false);
+      setIsCritical(existingEquipment.isCritical || false);
       setPreservationNotes(existingEquipment.preservationNotes || '');
       setCustomerSpecificRequirements(existingEquipment.customerSpecificRequirements || '');
       setCustomPlanId(existingEquipment.customPlanId || '');
+      setTypeId(existingEquipment.typeId || '');
     } else {
       setId('');
       setName('');
@@ -47,11 +48,11 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({ isOpen, onClose,
       setStatus('Ativo');
       setModel('');
       setYearOfManufacture('');
-      // FIX: Reset isCritical
       setIsCritical(false);
       setPreservationNotes('');
       setCustomerSpecificRequirements('');
       setCustomPlanId('');
+      setTypeId('');
     }
   }, [existingEquipment, isOpen]);
 
@@ -59,17 +60,19 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({ isOpen, onClose,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // FIX: Updated to use is_critical and fixed object literal assignment to Equipment type
+    // FIX: Correctly construct the equipment data object for saving
     const equipmentData: Equipment = {
-        ...(existingEquipment || { schedule: [] }),
+        // Spread existing to preserve fields not on the form
+        ...(existingEquipment || {}),
         id, 
         name, 
+        typeId, // Use typeId from state
         location, 
         category, 
         status, 
         model, 
         yearOfManufacture,
-        is_critical: isCritical, 
+        isCritical: isCritical, 
         preservationNotes, 
         customerSpecificRequirements,
         customPlanId: customPlanId || undefined,
@@ -137,7 +140,7 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({ isOpen, onClose,
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Família / Tipo</label>
-                    <select value={model} onChange={e => setModel(e.target.value)} required className="form-input text-xs font-bold">
+                    <select value={typeId} onChange={e => setTypeId(e.target.value)} required className="form-input text-xs font-bold">
                         <option value="">Selecione...</option>
                         {equipmentTypes.map(t => <option key={t.id} value={t.id}>{t.description}</option>)}
                     </select>

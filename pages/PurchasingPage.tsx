@@ -2,18 +2,17 @@
 import React, { useMemo, useState } from 'react';
 import { Header } from '../components/Header';
 import { useDataContext } from '../contexts/DataContext';
-import { PurchaseRequest, MaintenanceStatus } from '../types';
-// FIX: Removed unused and non-existent FilterIcon import to resolve type error.
+import { PurchaseRequest, WorkOrder } from '../types';
 import { ShoppingCartIcon, CheckCircleIcon, ClockIcon, ExclamationTriangleIcon, SearchIcon } from '../components/icons';
 
 export const PurchasingPage: React.FC = () => {
-    const { workOrders, equipmentData, setWorkOrders, setEquipmentData } = useDataContext();
+    const { workOrders, handleUnifiedSave } = useDataContext();
     const [filterStatus, setFilterStatus] = useState<string>('Pendente');
     const [searchTerm, setSearchTerm] = useState('');
 
     // Consolida todas as requisições de peças espalhadas pelo sistema
     const allRequests = useMemo(() => {
-        const reqs: (PurchaseRequest & { sourceId: string; sourceType: 'OS' | 'SCH'; equipmentId: string })[] = [];
+        const reqs: (PurchaseRequest & { sourceId: string; sourceType: 'OS'; equipmentId: string })[] = [];
 
         // 1. Das Ordens Avulsas
         workOrders.forEach(wo => {
@@ -24,19 +23,8 @@ export const PurchasingPage: React.FC = () => {
             }
         });
 
-        // 2. Do Cronograma
-        equipmentData.forEach(eq => {
-            eq.schedule.forEach(task => {
-                if (task.purchaseRequests) {
-                    task.purchaseRequests.forEach(pr => {
-                        reqs.push({ ...pr, sourceId: task.osNumber || task.id, sourceType: 'SCH', equipmentId: eq.id });
-                    });
-                }
-            });
-        });
-
         return reqs;
-    }, [workOrders, equipmentData]);
+    }, [workOrders]);
 
     const filtered = allRequests.filter(r => {
         const matchesStatus = filterStatus === 'Todos' || r.status === filterStatus;
@@ -48,18 +36,14 @@ export const PurchasingPage: React.FC = () => {
 
     const updateRequestStatus = (req: any, newStatus: PurchaseRequest['status']) => {
         if (req.sourceType === 'OS') {
-            setWorkOrders(prev => prev.map(wo => wo.id === req.sourceId ? {
-                ...wo,
-                purchaseRequests: wo.purchaseRequests?.map(p => p.id === req.id ? { ...p, status: newStatus, arrivalDate: newStatus === 'Entregue' ? new Date().toISOString() : undefined } : p)
-            } : wo));
-        } else {
-            setEquipmentData(prev => prev.map(eq => eq.id === req.equipmentId ? {
-                ...eq,
-                schedule: eq.schedule.map(t => (t.osNumber === req.sourceId || t.id === req.sourceId) ? {
-                    ...t,
-                    purchaseRequests: t.purchaseRequests?.map(p => p.id === req.id ? { ...p, status: newStatus, arrivalDate: newStatus === 'Entregue' ? new Date().toISOString() : undefined } : p)
-                } : t)
-            } : eq));
+            const orderToUpdate = workOrders.find(wo => wo.id === req.sourceId);
+            if (orderToUpdate) {
+                const updatedOrder: WorkOrder = {
+                    ...orderToUpdate,
+                    purchaseRequests: orderToUpdate.purchaseRequests?.map(p => p.id === req.id ? { ...p, status: newStatus, arrivalDate: newStatus === 'Entregue' ? new Date().toISOString() : undefined } : p)
+                };
+                handleUnifiedSave(updatedOrder);
+            }
         }
     };
 

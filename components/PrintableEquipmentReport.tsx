@@ -1,5 +1,3 @@
-
-
 import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom';
 // FIX: Corrected import path for types

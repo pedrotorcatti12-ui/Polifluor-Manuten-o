@@ -2,6 +2,7 @@ import React from 'react';
 import { PlusIcon, DeleteIcon } from './icons';
 import { TaskDetail } from '../types';
 
+// FIX: Allow 'materials' property on the DetailWithId type
 export interface DetailWithId extends TaskDetail {
   id: string;
 }
@@ -19,13 +20,15 @@ export const TaskDetailsSection: React.FC<TaskDetailsSectionProps> = ({
   predefinedActions,
   predefinedMaterials,
 }) => {
-  const handleDetailChange = (id: string, field: keyof TaskDetail, value: string) => {
+  // FIX: Correctly type the 'field' parameter to include 'materials'
+  const handleDetailChange = (id: string, field: keyof DetailWithId, value: string) => {
     onDetailsChange(
       details.map(d => (d.id === id ? { ...d, [field]: value } : d))
     );
   };
 
   const addDetail = () => {
+    // FIX: Add 'materials' property to the new detail object
     onDetailsChange([...details, { id: crypto.randomUUID(), action: '', materials: '' }]);
   };
 
@@ -72,6 +75,7 @@ export const TaskDetailsSection: React.FC<TaskDetailsSectionProps> = ({
                 list="materials-list"
                 placeholder="Materiais necessários"
                 value={detail.materials || ''}
+                // FIX: Correctly pass 'materials' as the field to update
                 onChange={(e) => handleDetailChange(detail.id, 'materials', e.target.value)}
                 className="form-input text-sm"
               />

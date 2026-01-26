@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from 'react';
-// FIX: Import the WorkOrder type to resolve type errors.
 import { WorkOrder, MaintenanceStatus, MaintenanceType } from '../types';
 import { Header } from '../components/Header';
-// FIX: Import the DownloadIcon component.
+// FIX: Import DownloadIcon
 import { DownloadIcon } from '../components/icons';
 import { useDebounce } from '../hooks/useDebounce';
 import { useDataContext } from '../contexts/DataContext';
@@ -22,7 +21,6 @@ interface HistoricalRecord {
 const ITEMS_PER_PAGE = 20;
 
 export const HistoryPage: React.FC = () => {
-    // FIX: Destructure workOrders from the data context.
     const { equipmentData, workOrders } = useDataContext();
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
@@ -33,48 +31,34 @@ export const HistoryPage: React.FC = () => {
     const equipmentMap = useMemo(() => new Map(equipmentData.map(e => [e.id, e])), [equipmentData]);
 
     const allHistoricalRecords = useMemo(() => {
-        const records: HistoricalRecord[] = [];
-
-        // Process tasks from equipment schedules
-        equipmentData.forEach(eq => {
-            eq.schedule.forEach(task => {
-                if (task.status === MaintenanceStatus.Executed) {
-                    records.push({
-                        id: task.osNumber || `${eq.id}-${task.year}-${task.month}`,
-                        equipmentId: eq.id,
-                        equipmentName: eq.name,
-                        location: eq.location,
-                        type: task.type,
-                        description: task.description,
-                        executionDate: task.endDate || task.startDate || new Date(task.year, 0, 1).toISOString(),
-                        maintainer: task.maintainer?.name || 'N/A',
-                        manHours: task.manHours || 0,
-                    });
-                }
-            });
-        });
-
-        // Process standalone work orders
-        workOrders.forEach(order => {
-            if (order.status === MaintenanceStatus.Executed) {
+        // FONTE ÚNICA DA VERDADE: Apenas Ordens de Serviço (WorkOrders) executadas.
+        const records: HistoricalRecord[] = workOrders
+            .filter(order => order.status === MaintenanceStatus.Executed)
+            .map(order => {
                 const equipment = equipmentMap.get(order.equipmentId);
-                records.push({
+                // FIX: Access manHours property correctly
+                const totalHours = (order.manHours || []).reduce((sum, entry) => sum + entry.hours, 0);
+                const maintainers = (order.manHours || []).map(mh => mh.maintainer).join(', ') || 'N/A';
+                
+                return {
                     id: order.id,
                     equipmentId: order.equipmentId,
-                    equipmentName: equipment?.name || 'N/A',
+                    equipmentName: equipment?.name || 'Ativo não localizado',
+                    // FIX: Access location property correctly
                     location: equipment?.location || 'N/A',
                     type: order.type,
                     description: order.description,
-                    executionDate: order.scheduledDate, // Assuming this is the execution date for simplicity
-                    maintainer: 'N/A', // WorkOrder type doesn't have a maintainer field
-                    manHours: order.manHours.reduce((sum, entry) => sum + entry.hours, 0),
-                });
-            }
-        });
+                    // Usa a data de finalização como a data de execução real.
+                    executionDate: order.endDate || order.scheduledDate,
+                    maintainer: maintainers,
+                    manHours: totalHours,
+                };
+            });
         
+        // Ordena pela data de execução mais recente.
         return records.sort((a, b) => new Date(b.executionDate).getTime() - new Date(a.executionDate).getTime());
 
-    }, [equipmentData, workOrders, equipmentMap]);
+    }, [workOrders, equipmentMap]);
 
     const filteredRecords = useMemo(() => {
         const lowercasedTerm = debouncedSearchTerm.toLowerCase();
@@ -141,7 +125,7 @@ export const HistoryPage: React.FC = () => {
         }
 
         const csvString = csvRows.join('\n');
-        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); // Add BOM for Excel
         const link = document.createElement("a");
         const url = URL.createObjectURL(blob);
         link.setAttribute("href", url);
@@ -157,16 +141,22 @@ export const HistoryPage: React.FC = () => {
         <div>
             <Header
                 title="Histórico de Manutenção"
-                subtitle="Consulte todas as ordens de serviço executadas."
+                subtitle="Consulte e exporte todas as ordens de serviço executadas."
+                 actions={
+                    <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-md transition-colors text-sm">
+                        <DownloadIcon />
+                        Exportar para Excel (CSV)
+                    </button>
+                }
             />
             
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 mb-6">
-                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                    <div className="md:col-span-2">
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div className="md:col-span-1">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Buscar</label>
                          <input
                             type="text"
-                            placeholder="Buscar por OS, equipamento, tipo, responsável..."
+                            placeholder="Buscar por OS, equipamento, tipo..."
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             className="w-full form-input"
@@ -180,12 +170,6 @@ export const HistoryPage: React.FC = () => {
                         <label htmlFor="end-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Data Final</label>
                         <input type="date" id="end-date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full form-input"/>
                     </div>
-                 </div>
-                 <div className="flex justify-end mt-4">
-                     <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-md transition-colors text-sm">
-                        <DownloadIcon />
-                        Exportar para Excel (CSV)
-                    </button>
                  </div>
             </div>
 

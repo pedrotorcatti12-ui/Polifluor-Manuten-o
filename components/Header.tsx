@@ -8,14 +8,14 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ title, subtitle, actions }) => {
   return (
-    <header className="flex justify-between items-start pb-4 border-b border-gray-200 dark:border-gray-700 mb-6">
+    <header className="flex flex-col sm:flex-row justify-between sm:items-center pb-4 border-b border-gray-200 mb-6 gap-4">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white tracking-tight">
+        <h1 className="text-2xl font-bold text-gray-800 tracking-tight">
           {title}
         </h1>
-        <p className="text-gray-500 dark:text-gray-400 mt-1">{subtitle}</p>
+        <p className="text-gray-500 mt-1 text-sm">{subtitle}</p>
       </div>
-       {actions && <div className="flex-shrink-0 ml-4">{actions}</div>}
+       {actions && <div className="flex-shrink-0">{actions}</div>}
     </header>
   );
 };

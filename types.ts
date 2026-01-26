@@ -1,102 +1,62 @@
+// FIX: Add UserRole, AssetCategory, CorrectiveCategory and other enums/types
+export type UserRole = 'admin' | 'operador';
 
 export enum MaintenanceStatus {
     Scheduled = 'Programado',
-    InField = 'Em Campo',
     Executed = 'Executado',
     Delayed = 'Atrasado',
-    Deactivated = 'Desativado',
+    InField = 'Em Campo',
     WaitingParts = 'Aguardando Peças',
+    Deactivated = 'Desativado',
     None = 'Nenhum',
-}
-
-export enum AssetCategory {
-    Industrial = 'Industrial',
-    Facility = 'Predial',
 }
 
 export enum MaintenanceType {
     Preventive = 'Preventiva',
-    Predictive = 'Preditiva',
     Corrective = 'Corretiva',
-    Overhaul = 'Revisão Geral',
+    Predictive = 'Preditiva',
     RevisaoPeriodica = 'Revisão Periódica',
-    PrestacaoServicos = 'Prestação de Serviços',
     Predial = 'Predial',
-    Melhoria = 'Melhoria'
+    Melhoria = 'Melhoria',
+    Overhaul = 'Overhaul',
+}
+
+export enum AssetCategory {
+    Industrial = 'Industrial',
+    Facility = 'Predial/Utilitário',
 }
 
 export enum CorrectiveCategory {
     Mechanical = 'Mecânica',
     Electrical = 'Elétrica',
-    Pneumatic = 'Pneumática',
     Hydraulic = 'Hidráulica',
-    Other = 'Outros'
+    Pneumatic = 'Pneumática',
+    Software = 'Software',
+    Operational = 'Operacional',
+    External = 'Causa Externa',
+    Building = 'Predial',
 }
 
 export interface TaskDetail {
   action: string;
-  materials?: string;
   checked?: boolean;
+  materials?: string;
 }
 
-export interface Maintainer {
-    name: string;
-    isExternal: boolean;
+export interface ManHourEntry {
+    maintainer: string;
+    hours: number;
 }
 
 export interface PurchaseRequest {
     id: string;
     itemDescription: string;
     quantity: number;
-    status: 'Pendente' | 'Comprado' | 'Entregue';
+    requester: string;
     requisitionDate: string;
-    arrivalDate?: string;
+    status: 'Pendente' | 'Comprado' | 'Entregue';
     purchaseOrderNumber?: string;
-}
-
-export interface MaintenanceTask {
-  id: string;
-  year: number;
-  month: string;
-  status: MaintenanceStatus;
-  type: MaintenanceType | null;
-  description: string;
-  details?: TaskDetail[];
-  osNumber?: string;
-  priority?: 'Alta' | 'Média' | 'Baixa';
-  startDate?: string; 
-  endDate?: string;   
-  manHours?: number;
-  planId?: string;
-  isPrepared?: boolean;
-  correctiveCategory?: CorrectiveCategory;
-  rootCause?: string;
-  requestDate?: string;
-  maintainer?: Maintainer;
-  requester?: string;
-  waitingForParts?: boolean;
-  purchaseRequests?: PurchaseRequest[];
-}
-
-export interface Equipment {
-  id: string;
-  name: string;
-  location: string;
-  category: AssetCategory; 
-  status: 'Ativo' | 'Inativo';
-  is_critical: boolean;
-  schedule: MaintenanceTask[];
-  manufacturer?: string;
-  model?: string;
-  yearOfManufacture?: string | number;
-  preservationNotes?: string;
-  customerSpecificRequirements?: string;
-  customPlanId?: string;
-}
-
-export interface ManHourEntry {
-    maintainer: string;
-    hours: number;
+    arrivalDate?: string;
 }
 
 export interface WorkOrder {
@@ -108,68 +68,42 @@ export interface WorkOrder {
     endDate?: string; 
     description: string;
     checklist?: TaskDetail[];
-    materialsUsed: { partId: string; quantity: number }[];
-    manHours: ManHourEntry[];
-    technicalAuditComment?: string;
-    requester: string;
-    machineStopped: boolean;
-    rootCause?: string;
     observations?: string;
-    miscNotes?: string;
-    downtimeNotes?: string;
+    planId?: string;
+
+    // Added properties
+    requester?: string;
+    rootCause?: string;
     correctiveCategory?: CorrectiveCategory;
-    isPrepared?: boolean;
+    machineStopped?: boolean;
+    manHours?: ManHourEntry[];
+    materialsUsed?: { partId: string; quantity: number }[];
     purchaseRequests?: PurchaseRequest[];
-    failureTime?: string;
-    restorationTime?: string;
+    miscNotes?: string;
+    reportPdfBase64?: string;
+    isPrepared?: boolean;
+    equipments?: Equipment | null;
+    deleted_at?: string;
 }
 
-export interface SparePart {
+export interface Equipment {
   id: string;
   name: string;
-  location: string;
-  unit: string;
-  cost: number;
-  minStock: number;
-  currentStock: number;
-  // Campos FO 044
-  avgConsumption?: number;
-  leadTime?: number;
-}
+  typeId: string; // Foreign key to EquipmentType
 
-export interface StockMovement {
-    id: string;
-    partId: string;
-    partName: string;
-    quantity: number;
-    type: 'Entrada' | 'Saída' | 'Ajuste';
-    reason: string;
-    userName: string;
-    user: string;
-    date: string;
-    workOrderId?: string;
-}
-
-export interface StatusConfig {
-    id: string;
-    label: MaintenanceStatus;
-    color: string;
-    symbol: string;
-}
-
-export interface SelectedTask {
-    equipment: Equipment;
-    monthIndex: number;
-    year: number;
-    task: MaintenanceTask;
-}
-
-export interface FlatTask {
-    equipment: Equipment;
-    task: MaintenanceTask;
-    year: number;
-    monthIndex: number;
-    key: string;
+  // Added properties
+  location?: string;
+  category?: AssetCategory;
+  status?: 'Ativo' | 'Inativo';
+  model?: string; 
+  yearOfManufacture?: string;
+  isCritical?: boolean;
+  preservationNotes?: string;
+  customerSpecificRequirements?: string;
+  customPlanId?: string;
+  manufacturer?: string;
+  schedule?: any; // To allow spread
+  deleted_at?: string;
 }
 
 export interface EquipmentType {
@@ -180,17 +114,78 @@ export interface EquipmentType {
 export interface MaintenancePlan {
     id: string;
     description: string;
-    equipment_type_id: string;
-    target_equipment_ids: string[];
-    frequency: number;
-    maintenance_type: MaintenanceType;
-    default_maintainer: string;
-    start_month: string;
+    equipmentTypeId: string;
+    frequency: number; // in months
     tasks: TaskDetail[];
+    
+    // Added properties
+    targetEquipmentIds?: string[];
+    maintenanceType?: MaintenanceType;
+    startMonth?: string;
+    deleted_at?: string;
 }
 
-export type Page = 'home' | 'dashboard' | 'work_center' | 'schedule' | 'work_orders' | 'equipment' | 'inventory' | 'inventory_logs' | 'purchasing' | 'history' | 'search_os' | 'quality' | 'information' | 'documentation' | 'settings' | 'advanced_reports' | 'equipment_types' | 'managerial_report' | 'reports';
-export type Theme = 'light' | 'dark';
+export type Page = 
+    | 'work_orders' 
+    | 'planning' 
+    | 'home' 
+    | 'equipment' 
+    | 'inventory' 
+    | 'reports' 
+    | 'history' 
+    | 'quality' 
+    | 'information'
+    | 'dashboard'
+    | 'settings'
+    | 'documentation'
+    | 'purchasing'
+    | 'inventory_logs'
+    | 'equipment_types'
+    | 'schedule';
+
+// Added missing types
+export interface StatusConfig {
+  id: string;
+  label: MaintenanceStatus;
+  color: string;
+  symbol: string;
+}
+
+export interface SparePart {
+    id: string; // SKU
+    name: string;
+    location: string;
+    unit: string; // e.g., 'PÇ', 'L', 'M'
+    cost: number;
+    minStock: number;
+    currentStock: number;
+}
+
+export interface MaintenanceTask {
+    id: string;
+    year: number;
+    month: string;
+    status: MaintenanceStatus;
+    type: MaintenanceType | null;
+    description: string;
+    osNumber?: string;
+    startDate?: string;
+    endDate?: string;
+    maintainer?: { name: string; isExternal: boolean };
+    manHours?: number;
+    details?: TaskDetail[];
+    isPrepared?: boolean;
+    requester?: string;
+    correctiveCategory?: CorrectiveCategory;
+}
+
+export interface FlatTask {
+    equipment: Equipment;
+    task: MaintenanceTask;
+    year: number;
+    monthIndex: number;
+    key: string;
+}
 
 export interface ReliabilityMetrics {
     mtbf: number | null;
@@ -198,4 +193,15 @@ export interface ReliabilityMetrics {
     availability: number;
     totalFailures: number;
     totalCorrectiveHours: number;
+}
+
+export interface StockMovement {
+    id: string;
+    partId: string;
+    partName: string;
+    type: 'Entrada' | 'Saída' | 'Ajuste';
+    quantity: number;
+    reason: string; // e.g., 'OS #1234', 'Ajuste de Inventário'
+    user: string;
+    date: string; // ISO string
 }

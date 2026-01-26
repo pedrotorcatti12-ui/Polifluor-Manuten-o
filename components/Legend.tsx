@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 // FIX: Corrected import path for types
 import { MaintenanceStatus, StatusConfig, MaintenanceType } from '../types';

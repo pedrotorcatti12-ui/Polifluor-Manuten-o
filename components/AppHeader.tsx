@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useDataContext } from '../contexts/DataContext';
-import { LogoutIcon, SunIcon, MoonIcon, PlusIcon, HomeIcon, ClipboardListIcon, ArrowPathIcon, GithubIcon } from './icons';
+// FIX: Add missing icon imports
+import { LogoutIcon, SunIcon, MoonIcon, PlusIcon, HomeIcon, ClipboardListIcon, ArrowPathIcon, RefreshIcon } from './icons';
 import { ConfirmationModal } from './ConfirmationModal';
 
 const PolifluorBrand = () => (
@@ -26,11 +26,14 @@ const ShortcutBtn: React.FC<{ icon: React.ReactNode; label: string; active: bool
 );
 
 export const AppHeader: React.FC<AppHeaderProps> = ({ onOpenCorrectiveRequest, onToggleSidebar }) => {
-    const { theme, setTheme, handleLogout, currentPage, setCurrentPage } = useAppContext();
-    const { isSyncing, cloudConnected, showToast } = useDataContext();
+    // FIX: Destructure missing properties from contexts
+    const { theme, setTheme, handleLogout, currentPage, setCurrentPage, userRole } = useAppContext();
+    const { isSyncing, cloudConnected, forceFullDatabaseRefresh } = useDataContext();
     const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
     const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
+
+    const isAdmin = userRole === 'admin';
 
     return (
         <>
@@ -44,6 +47,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onOpenCorrectiveRequest, o
                     <PolifluorBrand />
 
                     <div className="flex items-center gap-1">
+                        {/* FIX: Correctly call setCurrentPage with a valid Page type */}
                         <ShortcutBtn icon={<HomeIcon />} label="Início" active={currentPage === 'home'} onClick={() => setCurrentPage('home')} />
                         <ShortcutBtn icon={<ClipboardListIcon />} label="O.S." active={currentPage === 'work_orders'} onClick={() => setCurrentPage('work_orders')} />
                     </div>
@@ -55,9 +59,20 @@ export const AppHeader: React.FC<AppHeaderProps> = ({ onOpenCorrectiveRequest, o
                         <span className="text-[10px] font-black uppercase">{cloudConnected ? 'Online' : 'Offline'}</span>
                     </div>
 
+                    {isAdmin && (
+                        <button 
+                            onClick={forceFullDatabaseRefresh}
+                            disabled={isSyncing}
+                            title="Forçar Sincronização com o Banco de Dados"
+                            className="p-2 text-slate-400 rounded-lg hover:bg-slate-100 disabled:opacity-50"
+                        >
+                            <RefreshIcon className={`w-5 h-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                        </button>
+                    )}
+                    
                     <button 
                         onClick={onOpenCorrectiveRequest} 
-                        className="px-5 py-2 bg-[#D32F2F] hover:bg-red-800 text-white font-black rounded-lg transition-all text-xs uppercase shadow-md flex items-center gap-2"
+                        className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-lg transition-all text-xs uppercase shadow-md flex items-center gap-2"
                     >
                         <PlusIcon className="w-4 h-4"/>
                         Solicitar Corretiva
