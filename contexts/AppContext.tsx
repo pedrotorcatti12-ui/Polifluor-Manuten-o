@@ -1,48 +1,71 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { Page, Theme, WorkOrder } from '../types';
+import { Page, WorkOrder, MaintenancePlan, UserRole } from '../types';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface AppContextType {
-    isLoggedIn: boolean;
-    handleLogin: (success: boolean) => void;
-    handleLogout: () => void;
     currentPage: Page;
     setCurrentPage: (page: Page) => void;
-    theme: Theme;
-    setTheme: (theme: Theme) => void;
+    
     isOSModalOpen: boolean;
     setIsOSModalOpen: (isOpen: boolean) => void;
     editingOrder: WorkOrder | null;
     setEditingOrder: (order: WorkOrder | null) => void;
+    
+    isPlanModalOpen: boolean;
+    setIsPlanModalOpen: (isOpen: boolean) => void;
+    editingPlan: MaintenancePlan | null;
+    setEditingPlan: (plan: MaintenancePlan | null) => void;
+
+    userRole: UserRole | null;
+    handleLogin: (role: UserRole) => void;
+    handleLogout: () => void;
+    theme: 'light' | 'dark';
+    setTheme: (theme: 'light' | 'dark') => void;
+    requestAdminPassword: (callback: () => void) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // Transição para Memory-State (Fim do Single Point of Failure no LocalStorage)
-    const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [currentPage, setCurrentPage] = useState<Page>('home');
-    const [theme, setTheme] = useState<Theme>('light');
     
     const [isOSModalOpen, setIsOSModalOpen] = useState(false);
     const [editingOrder, setEditingOrder] = useState<WorkOrder | null>(null);
 
-    const handleLogin = (success: boolean) => {
-        setIsLoggedIn(success);
-        if (success) setCurrentPage('home');
+    const [isPlanModalOpen, setIsPlanModalOpen] = useState(false);
+    const [editingPlan, setEditingPlan] = useState<MaintenancePlan | null>(null);
+
+    const [userRole, setUserRole] = useState<UserRole | null>(null);
+    const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('sgmi-theme', 'light');
+
+    const handleLogin = (role: UserRole) => {
+        setUserRole(role);
+        setCurrentPage('home');
     };
 
     const handleLogout = () => {
-        setIsLoggedIn(false);
-        setCurrentPage('home');
+        setUserRole(null); 
+    };
+
+    const requestAdminPassword = (callback: () => void) => {
+        // Em uma aplicação real, isso abriria um modal de senha.
+        // Para este ambiente, vamos assumir que a senha está correta e executar o callback.
+        callback();
     };
 
     return (
         <AppContext.Provider value={{
-            isLoggedIn, handleLogin, handleLogout,
             currentPage, setCurrentPage,
-            theme, setTheme,
             isOSModalOpen, setIsOSModalOpen,
-            editingOrder, setEditingOrder
+            editingOrder, setEditingOrder,
+            isPlanModalOpen, setIsPlanModalOpen,
+            editingPlan, setEditingPlan,
+            userRole,
+            handleLogin,
+            handleLogout,
+            theme,
+            setTheme,
+            requestAdminPassword
         }}>
             {children}
         </AppContext.Provider>
@@ -51,6 +74,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useAppContext = (): AppContextType => {
     const context = useContext(AppContext);
-    if (!context) throw new Error('useAppContext Provider Error');
+    if (!context) throw new Error('useAppContext must be used within an AppProvider');
     return context;
 };

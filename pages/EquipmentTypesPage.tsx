@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Header } from '../components/Header';
 import { EquipmentType } from '../types';
@@ -9,6 +8,7 @@ import { useDataContext } from '../contexts/DataContext';
 import { useDebounce } from '../hooks/useDebounce';
 
 export const EquipmentTypesPage: React.FC = () => {
+    // FIX: Destructure missing properties from context
     const { equipmentTypes, handleEquipmentTypeSave, handleEquipmentTypeDelete, equipmentData, showToast } = useDataContext();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingType, setEditingType] = useState<EquipmentType | null>(null);
@@ -66,7 +66,8 @@ export const EquipmentTypesPage: React.FC = () => {
     };
     
     const handleDeleteClick = (type: EquipmentType) => {
-        const isInUse = equipmentData.some(eq => eq.model === type.id);
+        // FIX: Access 'typeId' property to check if type is in use
+        const isInUse = equipmentData.some(eq => eq.typeId === type.id);
         if (isInUse) {
             alert(`Não é possível excluir o tipo "${type.description}" pois ele está sendo utilizado por um ou mais equipamentos.`);
             return;

@@ -20,10 +20,10 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
 
     const showToast = useCallback((message: string, type: ToastType = 'info') => {
         const id = crypto.randomUUID();
-        setToasts(prev => [...prev, { id, message, type }]);
+        setToasts(prev => [{ id, message, type }, ...prev]);
         setTimeout(() => {
-            setToasts(prev => prev.filter(t => t.id !== id));
-        }, 3000); // Auto close after 3 seconds
+            removeToast(id);
+        }, 4000);
     }, []);
 
     const removeToast = (id: string) => {
@@ -33,27 +33,20 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     return (
         <ToastContext.Provider value={{ showToast }}>
             {children}
-            <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+            <div className="fixed top-5 right-5 z-[200] flex flex-col gap-3 w-full max-w-sm">
                 {toasts.map(toast => (
                     <div 
                         key={toast.id}
-                        className={`pointer-events-auto flex items-center p-4 min-w-[300px] rounded-lg shadow-lg border-l-4 transition-all animate-fade-in bg-white dark:bg-gray-800 ${
-                            toast.type === 'success' ? 'border-green-500' :
-                            toast.type === 'error' ? 'border-red-500' :
-                            toast.type === 'warning' ? 'border-yellow-500' :
-                            'border-blue-500'
-                        }`}
+                        className="flex items-center p-4 rounded-lg shadow-lg border-l-4 bg-white animate-fade-in"
                     >
                         <div className="flex-shrink-0 mr-3">
-                            {toast.type === 'success' && <CheckCircleIcon className="w-6 h-6 text-green-500" />}
-                            {toast.type === 'error' && <CloseIcon className="w-6 h-6 text-red-500" />}
-                            {toast.type === 'warning' && <ExclamationTriangleIcon className="w-6 h-6 text-yellow-500" />}
+                            {toast.type === 'success' && <CheckCircleIcon className="w-6 h-6 text-emerald-500" />}
+                            {toast.type === 'error' && <ExclamationTriangleIcon className="w-6 h-6 text-rose-500" />}
+                            {toast.type === 'warning' && <ExclamationTriangleIcon className="w-6 h-6 text-amber-500" />}
                             {toast.type === 'info' && <InfoIcon className="w-6 h-6 text-blue-500" />}
                         </div>
-                        <div className="flex-1 text-sm font-medium text-gray-800 dark:text-gray-100">
-                            {toast.message}
-                        </div>
-                        <button onClick={() => removeToast(toast.id)} className="ml-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <p className="flex-1 text-sm font-semibold text-slate-700">{toast.message}</p>
+                        <button onClick={() => removeToast(toast.id)} className="ml-3 text-slate-400 hover:text-slate-600">
                             <CloseIcon className="w-4 h-4" />
                         </button>
                     </div>

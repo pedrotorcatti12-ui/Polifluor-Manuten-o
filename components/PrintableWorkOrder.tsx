@@ -1,4 +1,5 @@
 import React from 'react';
+// FIX: Import FlatTask type
 import { FlatTask, MaintenanceType } from '../types';
 
 interface PrintableWorkOrderProps {
@@ -43,6 +44,7 @@ const PredictiveChecklist = [
 
 export const PrintableWorkOrder: React.FC<PrintableWorkOrderProps> = ({ taskData, editedOsNumber, partReplaced, purchasingInvolved, logoUrl }) => {
   const { equipment, task } = taskData;
+  // FIX: Add Predictive to MaintenanceType enum to allow this check
   const isPredictive = task.type === MaintenanceType.Predictive;
   
   const logoContent = logoUrl

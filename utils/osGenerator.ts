@@ -2,32 +2,43 @@
 import { Equipment, WorkOrder } from '../types';
 
 /**
- * Calcula o próximo número de Ordem de Serviço disponível.
- * Regra: Busca o PRIMEIRO número inteiro disponível a partir de 1.
- * Exemplo: Se 0001 existe, mas 0002 não, retorna 0002.
- * Se 0006 existe, pula para o próximo livre.
+ * Calcula o próximo número de Ordem de Serviço disponível de forma eficiente.
+ * Regra: Encontra o maior número de OS existente e retorna o próximo número na sequência.
+ * Exemplo: Se a OS mais alta for #0350, a próxima será #0351.
  * Formato: 0001, 0002...
  */
 export const getNextOSNumber = (equipmentData: Equipment[], workOrders: WorkOrder[]): string => {
-    const usedIds = new Set<string>();
+    const usedIdsAsNumbers = new Set<number>();
 
-    // Coleta todos os IDs em uso
-    workOrders.forEach(order => usedIds.add(order.id));
-    equipmentData.forEach(eq => {
-        eq.schedule.forEach(task => {
-            if (task.osNumber) usedIds.add(task.osNumber);
-        });
+    // Coleta todos os IDs numéricos em uso a partir da fonte única da verdade (workOrders)
+    workOrders.forEach(order => {
+        const num = parseInt(order.id, 10);
+        if (!isNaN(num)) usedIdsAsNumbers.add(num);
     });
 
-    let candidate = 1;
-    while (true) {
-        const candidateStr = String(candidate).padStart(4, '0');
-        // Se este número não estiver em uso, ele é o próximo
-        if (!usedIds.has(candidateStr)) {
-            return candidateStr;
-        }
-        candidate++;
-        // Safety break (embora improvável atingir 10k tão cedo)
-        if (candidate > 99999) return 'ERROR';
+    const maxId = usedIdsAsNumbers.size > 0 ? Math.max(...Array.from(usedIdsAsNumbers)) : 0;
+    
+    return String(maxId + 1).padStart(4, '0');
+};
+
+/**
+ * Gera um bloco de números de OS sequenciais e únicos.
+ * Encontra o maior número de OS existente e gera os próximos 'count' números.
+ * @param count O número de novos IDs a serem gerados.
+ * @param existingWorkOrders A lista atual de ordens de serviço.
+ * @returns Um array de strings com os novos IDs de OS.
+ */
+export const generateSequentialOSNumbers = (count: number, existingWorkOrders: WorkOrder[]): string[] => {
+    const usedIdsAsNumbers = existingWorkOrders
+        .map(order => parseInt(order.id, 10))
+        .filter(num => !isNaN(num));
+
+    const maxId = usedIdsAsNumbers.length > 0 ? Math.max(...usedIdsAsNumbers) : 0;
+    
+    const newIds: string[] = [];
+    for (let i = 1; i <= count; i++) {
+        newIds.push(String(maxId + i).padStart(4, '0'));
     }
+    
+    return newIds;
 };

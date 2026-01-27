@@ -1,152 +1,131 @@
-
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppContext } from './contexts/AppContext';
 import { useDataContext } from './contexts/DataContext';
-import { useToast } from './contexts/ToastContext';
+import { Page, WorkOrder, MaintenanceStatus, MaintenanceType } from './types';
 
 // Import Pages
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
-import { SchedulePage } from './pages/SchedulePage';
-import { InventoryPage } from './pages/InventoryPage';
-import { InventoryLogsPage } from './pages/InventoryLogsPage';
-import { SettingsPage } from './pages/SettingsPage';
-import { EquipmentPage } from './pages/EquipmentPage';
-import { WorkCenterPage } from './pages/WorkCenterPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { WorkOrderPage } from './pages/WorkOrderPage';
-import { HistoryPage } from './pages/HistoryPage';
-import { AdvancedReportsPage } from './pages/AdvancedReportsPage';
-import { WorkOrderSearchPage } from './pages/WorkOrderSearchPage';
-import { QualityPage } from './pages/QualityPage';
-import { InformationPage } from './pages/InformationPage';
-import { DocumentationPage } from './pages/DocumentationPage';
-import { PurchasingPage } from './pages/PurchasingPage';
+import { WorkOrdersPage } from './pages/WorkOrdersPage';
+import { PlanningPage } from './pages/PlanningPage';
+import { EquipmentPage } from './pages/EquipmentPage';
 import { EquipmentTypesPage } from './pages/EquipmentTypesPage';
-import { ManagerialReportPage } from './pages/ManagerialReportPage';
+import { InventoryPage } from './pages/InventoryPage';
+import { PurchasingPage } from './pages/PurchasingPage';
+import { InventoryLogsPage } from './pages/InventoryLogsPage';
+import { QualityPage } from './pages/QualityPage';
+import { HistoryPage } from './pages/HistoryPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { DocumentationPage } from './pages/DocumentationPage';
+import { InformationPage } from './pages/InformationPage';
+import { PermissionDenied } from './components/PermissionDenied';
+import { SchedulePage } from './pages/SchedulePage';
 
 // Import Components
-import { AppHeader } from './components/AppHeader';
 import { Sidebar } from './components/Sidebar';
-import { WorkOrderControlModal } from './components/WorkOrderControlModal';
+import { AppHeader } from './components/AppHeader';
+import { MaintenancePlanModal } from './components/MaintenancePlanModal';
 import { CorrectiveRequestModal } from './components/CorrectiveRequestModal';
-import { MaintenanceStatus, WorkOrder, MaintenanceType, CorrectiveCategory } from './types';
 import { getNextOSNumber } from './utils/osGenerator';
+import { WorkOrderControlModal } from './components/WorkOrderControlModal';
 
 const AppContent: React.FC = () => {
-    const { isLoggedIn, currentPage, theme, handleLogin, isOSModalOpen, setIsOSModalOpen, editingOrder, setEditingOrder } = useAppContext();
-    const { equipmentData, workOrders, inventoryData, maintainers, requesters, handleUnifiedSave } = useDataContext();
-    const { showToast } = useToast();
+    const { 
+        currentPage, userRole, handleLogin,
+        isOSModalOpen, setIsOSModalOpen, editingOrder,
+        isPlanModalOpen, setIsPlanModalOpen, editingPlan
+    } = useAppContext();
     
-    // isSidebarOpen: true = Expandida (260px), false = Mini (72px)
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [isCorrectiveRequestOpen, setIsCorrectiveRequestOpen] = useState(false);
-
-    useEffect(() => {
-        if (theme === 'dark') document.documentElement.classList.add('dark');
-        else document.documentElement.classList.remove('dark');
-    }, [theme]);
-
-    // Em telas pequenas, fecha a sidebar ao mudar de página
-    useEffect(() => {
-        if (window.innerWidth < 768) {
-            setIsSidebarOpen(false);
-        }
-    }, [currentPage]);
+    const { 
+        equipmentData, workOrders, handleSaveWorkOrder,
+        equipmentTypes, handlePlanSave, showToast, requesters,
+        inventoryData, maintainers,
+    } = useDataContext();
     
-    const handleSaveUnifiedOS = (updatedOrder: WorkOrder) => {
-        handleUnifiedSave(updatedOrder);
-        setIsOSModalOpen(false);
-        setEditingOrder(null);
-    };
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isCorrectiveModalOpen, setIsCorrectiveModalOpen] = useState(false);
 
-    const handleCreateQuickCorrective = (equipmentId: string, description: string, requester: string, priority: 'Alta' | 'Média' | 'Baixa', osNumber: string, category?: CorrectiveCategory, failureDateTime?: string) => {
-        const nextId = osNumber || getNextOSNumber(equipmentData, workOrders);
-        const newOrder: WorkOrder = {
-            id: nextId,
-            equipmentId,
-            type: MaintenanceType.Corrective,
-            status: priority === 'Alta' ? MaintenanceStatus.Delayed : MaintenanceStatus.Scheduled,
-            description,
-            scheduledDate: failureDateTime || new Date().toISOString().slice(0, 16),
-            requester,
-            machineStopped: priority === 'Alta',
-            manHours: [],
-            materialsUsed: [],
-            observations: '',
-            miscNotes: '',
-            downtimeNotes: '',
-            correctiveCategory: category,
-            rootCause: ''
-        };
-        
-        handleUnifiedSave(newOrder);
-        setIsCorrectiveRequestOpen(false);
-    };
+    const nextOSNumber = useMemo(() => getNextOSNumber(equipmentData, workOrders), [workOrders, equipmentData]);
 
-    const toggleSidebar = useCallback(() => {
-        setIsSidebarOpen(prev => !prev);
-    }, []);
+    if (!userRole) {
+        return <LoginPage onLogin={handleLogin} />;
+    }
 
-    // Fecha sidebar se clicar no conteúdo principal em mobile
-    const handleMainContentClick = () => {
-        if (window.innerWidth < 768 && isSidebarOpen) {
-            setIsSidebarOpen(false);
-        }
-    };
+    const isAdmin = userRole === 'admin';
+
+    const pagesWithAdminAccess: Page[] = [
+        'dashboard', 'planning', 'equipment', 'equipment_types', 'inventory', 
+        'purchasing', 'quality', 'reports', 'settings', 'inventory_logs'
+    ];
 
     const renderPage = () => {
+        if (!isAdmin && pagesWithAdminAccess.includes(currentPage)) {
+            return <PermissionDenied />;
+        }
+        
         switch (currentPage) {
             case 'home': return <HomePage />;
             case 'dashboard': return <DashboardPage />;
-            case 'work_center': return <WorkCenterPage />;
+            case 'work_orders': return <WorkOrdersPage />;
+            case 'planning': return <PlanningPage />;
             case 'schedule': return <SchedulePage />;
-            case 'work_orders': return <WorkOrderPage />;
             case 'equipment': return <EquipmentPage />;
+            case 'equipment_types': return <EquipmentTypesPage />;
             case 'inventory': return <InventoryPage />;
             case 'inventory_logs': return <InventoryLogsPage />;
             case 'purchasing': return <PurchasingPage />;
-            case 'history': return <HistoryPage />;
-            case 'advanced_reports': return <AdvancedReportsPage />;
-            case 'search_os': return <WorkOrderSearchPage />;
             case 'quality': return <QualityPage />;
-            case 'information': return <InformationPage />;
-            case 'documentation': return <DocumentationPage />;
-            case 'settings': return <SettingsPage />;
-            case 'equipment_types': return <EquipmentTypesPage />;
-            case 'managerial_report': return <ManagerialReportPage />;
+            case 'history': return <HistoryPage />;
             case 'reports': return <ReportsPage />;
+            case 'settings': return <SettingsPage />;
+            case 'documentation': return <DocumentationPage />;
+            case 'information': return <InformationPage />;
             default: return <HomePage />;
         }
     };
     
-    if (!isLoggedIn) return <LoginPage onLogin={handleLogin} />;
+    const handleSaveOS = async (order: WorkOrder) => {
+        const success = await handleSaveWorkOrder(order);
+        if (success) {
+            showToast(`Ordem de Serviço #${order.id} salva.`, 'success');
+        }
+    }
     
-    return (
-        <div className={`min-h-screen font-sans ${theme === 'dark' ? 'dark' : ''} flex overflow-hidden`}>
-            {/* Sidebar Fixa */}
-            <div 
-                className={`fixed inset-y-0 left-0 z-50 transition-all duration-300 ease-in-out bg-white dark:bg-gray-900 border-r border-slate-200 dark:border-gray-800 shadow-xl
-                ${isSidebarOpen ? 'w-64' : 'w-[72px]'}`}
-            >
-                <Sidebar 
-                    isCollapsed={!isSidebarOpen} 
-                    onToggle={toggleSidebar}
-                    onCloseMobile={() => setIsSidebarOpen(false)} 
-                />
-            </div>
+    const handleCreateCorrective = async (equipmentId: string, description: string, requester: string, priority: string, osNumber: string, category?: any, failureDateTime?: string, type?: any, location?: string) => {
+        const nextId = getNextOSNumber(equipmentData, workOrders);
+        const newOrder: WorkOrder = {
+            id: nextId,
+            equipmentId,
+            description,
+            requester,
+            type: type || MaintenanceType.Corrective,
+            status: MaintenanceStatus.Scheduled,
+            scheduledDate: failureDateTime || new Date().toISOString(),
+            correctiveCategory: category,
+            machineStopped: priority === 'Alta',
+            observations: location, // Salva a localização aqui
+        };
+        await handleSaveWorkOrder(newOrder);
+        setIsCorrectiveModalOpen(false);
+    };
 
-            {/* Main Content */}
-            <main 
-                className={`flex-1 flex flex-col h-screen overflow-hidden bg-gray-100 dark:bg-gray-950 text-gray-900 dark:text-white transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-[72px]'}`}
-                onClick={handleMainContentClick}
-            >
+    return (
+        <div className="flex h-screen bg-slate-100 font-sans dark:bg-gray-900">
+            <Sidebar 
+              isCollapsed={isSidebarCollapsed}
+              onToggle={() => setIsSidebarCollapsed(prev => !prev)}
+              onCloseMobile={() => {
+                  if (window.innerWidth < 768) setIsSidebarCollapsed(true);
+              }}
+            />
+            <main className="flex-1 flex flex-col overflow-hidden">
                 <AppHeader 
-                    onOpenCorrectiveRequest={() => setIsCorrectiveRequestOpen(true)} 
-                    onToggleSidebar={toggleSidebar}
+                    onToggleSidebar={() => setIsSidebarCollapsed(prev => !prev)} 
+                    onOpenCorrectiveRequest={() => setIsCorrectiveModalOpen(true)}
                 />
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8 bg-gray-50 dark:bg-gray-900/50 scroll-smooth">
+                <div className="flex-1 p-4 md:p-8 overflow-y-auto bg-slate-50 dark:bg-gray-950">
                     {renderPage()}
                 </div>
             </main>
@@ -154,22 +133,38 @@ const AppContent: React.FC = () => {
             {isOSModalOpen && (
                 <WorkOrderControlModal
                     isOpen={isOSModalOpen}
-                    onClose={() => { setIsOSModalOpen(false); setEditingOrder(null); }}
-                    onSave={handleSaveUnifiedOS}
+                    onClose={() => setIsOSModalOpen(false)}
+                    onSave={handleSaveOS} // onSave is passed but the modal uses context directly
+                    existingOrder={editingOrder}
                     equipmentData={equipmentData}
                     inventoryData={inventoryData}
-                    existingOrder={editingOrder}
-                    nextOSNumber={getNextOSNumber(equipmentData, workOrders)}
+                    nextOSNumber={nextOSNumber}
                     maintainers={maintainers}
                     requesters={requesters}
                 />
             )}
 
-            {isCorrectiveRequestOpen && (
+            {isPlanModalOpen && (
+                <MaintenancePlanModal
+                    isOpen={isPlanModalOpen}
+                    onClose={() => setIsPlanModalOpen(false)}
+                    onSave={async (plan) => {
+                        const success = await handlePlanSave(plan);
+                        if (success) {
+                            setIsPlanModalOpen(false);
+                            showToast('Plano de Manutenção salvo!', 'success');
+                        }
+                    }}
+                    existingPlan={editingPlan}
+                    equipmentTypes={equipmentTypes}
+                />
+            )}
+            
+            {isCorrectiveModalOpen && (
                 <CorrectiveRequestModal 
-                    isOpen={isCorrectiveRequestOpen}
-                    onClose={() => setIsCorrectiveRequestOpen(false)}
-                    onCreate={handleCreateQuickCorrective}
+                    isOpen={isCorrectiveModalOpen}
+                    onClose={() => setIsCorrectiveModalOpen(false)}
+                    onCreate={handleCreateCorrective}
                     equipmentList={equipmentData}
                     requesters={requesters}
                 />

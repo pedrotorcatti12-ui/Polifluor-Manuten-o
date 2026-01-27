@@ -1,8 +1,8 @@
-
 import React, { useMemo } from 'react';
 import { useAppContext } from '../contexts/AppContext';
 import { useDataContext } from '../contexts/DataContext';
 import { MaintenanceStatus } from '../types';
+// FIX: Add missing icon imports
 import { ClipboardListIcon, ScheduleIcon, ChartIcon, ShieldCheckIcon, ExclamationTriangleIcon } from '../components/icons';
 
 const PolifluorLogo = () => (
@@ -29,7 +29,7 @@ export const HomePage: React.FC = () => {
                 <p className="text-slate-500 font-bold uppercase tracking-widest text-xs mt-2">Conformidade IATF 16949 • Planta Industrial</p>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div onClick={() => setCurrentPage('work_orders')} className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-[#D32F2F] hover:shadow-xl transition-all cursor-pointer">
                     <div className="flex justify-between items-start">
                         <ClipboardListIcon className="w-10 h-10 text-slate-300" />
@@ -48,12 +48,7 @@ export const HomePage: React.FC = () => {
                     <p className="text-[10px] text-rose-400 font-bold uppercase">Risco de Parada</p>
                 </div>
 
-                <div onClick={() => setCurrentPage('schedule')} className="bg-white p-6 rounded-2xl shadow-sm border-t-4 border-blue-600 hover:shadow-xl transition-all cursor-pointer">
-                    <ScheduleIcon className="w-10 h-10 text-slate-300" />
-                    <h3 className="font-black uppercase text-sm mt-4">Plano 2026</h3>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Cronograma Mestre</p>
-                </div>
-
+                {/* FIX: Correct Page type for navigation */}
                 <div onClick={() => setCurrentPage('quality')} className="bg-slate-900 p-6 rounded-2xl shadow-sm border-t-4 border-emerald-500 hover:shadow-xl transition-all cursor-pointer text-white">
                     <ShieldCheckIcon className="w-10 h-10 text-emerald-500" />
                     <h3 className="font-black uppercase text-sm mt-4">Auditoria IATF</h3>

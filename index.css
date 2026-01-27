@@ -1,26 +1,32 @@
-
 @import url('https://rsms.me/inter/inter.css');
 
-:root {
-    --brand-primary: #D32F2F;
-    --brand-dark: #B71C1C;
-    --bg-main: #F8FAFC;
+html { font-family: 'Inter', sans-serif; }
+
+.form-input {
+    @apply border-slate-200 rounded-lg focus:ring-blue-500 focus:border-blue-500 font-medium text-sm;
 }
 
-html { font-family: 'Inter', sans-serif; background-color: var(--bg-main); }
-
-.bg-brand { background-color: var(--brand-primary); }
-.text-brand { color: var(--brand-primary); }
-
 .animate-fade-in {
-    animation: fadeIn 0.4s ease-out;
+    animation: fadeIn 0.3s ease-out forwards;
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
+    from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-.form-input {
-    @apply border-slate-200 rounded-xl focus:ring-[#D32F2F] focus:border-[#D32F2F] font-bold text-sm;
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }

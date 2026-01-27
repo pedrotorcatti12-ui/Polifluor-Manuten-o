@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Header } from '../components/Header';
 import { 
@@ -8,11 +7,9 @@ import {
     SecurityIcon, 
     TargetIcon,
     DocumentTextIcon,
-    DownloadIcon,
     WrenchIcon,
     PackageIcon,
-    ClipboardListIcon,
-    ArrowPathIcon
+    ClipboardListIcon
 } from '../components/icons';
 
 declare const window: any;
@@ -210,7 +207,15 @@ const ROISection = () => (
                     </div>
                     <div className="flex gap-3">
                         <CheckCircleIcon className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-                        <p className="text-gray-700 dark:text-gray-300"><strong>Propriedade de Dados:</strong> O banco de dados pertence à Polifluor (sem vendor lock-in).</p>
+                        <p className="text-gray-700 dark:text-gray-300"><strong>Decisão Rápida:</strong> KPIs em tempo real para ações corretivas imediatas.</p>
+                    </div>
+                    <div className="flex gap-3">
+                        <CheckCircleIcon className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                        <p className="text-gray-700 dark:text-gray-300"><strong>Redução de Custos:</strong> Otimização do estoque mínimo (FO-044) e menos paradas.</p>
+                    </div>
+                    <div className="flex gap-3">
+                        <CheckCircleIcon className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                        <p className="text-gray-700 dark:text-gray-300"><strong>Engajamento:</strong> Interface moderna e rápida que valoriza o tempo do técnico.</p>
                     </div>
                 </div>
             </div>
@@ -218,114 +223,32 @@ const ROISection = () => (
     </div>
 );
 
+type Tab = 'manual' | 'it' | 'roi';
+
 export const InformationPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'it' | 'manual' | 'roi'>('it');
-    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+    const [activeTab, setActiveTab] = useState<Tab>('manual');
     const contentRef = useRef<HTMLDivElement>(null);
 
-    const getPrintLabel = () => {
-        switch(activeTab) {
-            case 'it': return 'Exportar Instrução (PDF)';
-            case 'manual': return 'Exportar Manual (PDF)';
-            case 'roi': return 'Exportar Indicadores (PDF)';
-            default: return 'Exportar';
+    const renderContent = () => {
+        switch (activeTab) {
+            case 'it': return <ITSection />;
+            case 'roi': return <ROISection />;
+            default: return <ManualSection />;
         }
     };
-
-    const handleExportPdf = async () => {
-        if (!contentRef.current) return;
-        if (typeof window.jspdf === 'undefined' || typeof html2canvas === 'undefined') {
-            alert('Aguarde o carregamento das bibliotecas de PDF e tente novamente.');
-            return;
-        }
-
-        setIsGeneratingPdf(true);
-
-        try {
-            const canvas = await html2canvas(contentRef.current, { 
-                scale: 2, // Melhor qualidade
-                useCORS: true,
-                backgroundColor: '#ffffff' // Força fundo branco
-            });
-
-            const imgData = canvas.toDataURL('image/png');
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            
-            const imgWidth = 210; // A4 width in mm
-            const pageHeight = 297; // A4 height in mm
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-            let heightLeft = imgHeight;
-            let position = 0;
-
-            // Primeira página
-            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
-
-            // Páginas subsequentes se a imagem for maior que uma página
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
-                pdf.addPage();
-                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-            }
-
-            const fileName = `SGMI_Documentacao_${activeTab}_${new Date().getTime()}.pdf`;
-            pdf.save(fileName);
-
-        } catch (error) {
-            console.error("Erro ao gerar PDF:", error);
-            alert("Ocorreu um erro ao gerar o documento.");
-        } finally {
-            setIsGeneratingPdf(false);
-        }
-    };
-
-    const TabButton: React.FC<{ id: string; label: string; icon: React.ReactNode }> = ({ id, label, icon }) => (
-        <button
-            onClick={() => setActiveTab(id as any)}
-            className={`flex items-center gap-2 px-6 py-4 font-black text-[11px] uppercase tracking-wider transition-all duration-200 border-b-2 whitespace-nowrap ${
-                activeTab === id 
-                ? 'border-blue-600 text-blue-600 bg-blue-50/50 dark:bg-blue-900/20' 
-                : 'border-transparent text-gray-400 hover:text-gray-600 dark:text-gray-500'
-            }`}
-        >
-            {icon}
-            {label}
-        </button>
-    );
 
     return (
-        <div className="max-w-6xl mx-auto pb-12 relative">
-            <div>
-                <Header
-                    title="Central de Conhecimento & Documentação"
-                    subtitle="Manuais, Procedimentos (IT) e Dados Estratégicos."
-                    actions={
-                        <button 
-                            onClick={handleExportPdf}
-                            disabled={isGeneratingPdf}
-                            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white font-black rounded-xl text-xs uppercase tracking-widest hover:bg-slate-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-wait"
-                        >
-                            {isGeneratingPdf ? <ArrowPathIcon className="w-4 h-4 animate-spin"/> : <DownloadIcon className="w-4 h-4" />}
-                            {isGeneratingPdf ? 'Gerando PDF...' : getPrintLabel()}
-                        </button>
-                    }
-                />
-
-                <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto custom-scrollbar mb-8 bg-white dark:bg-gray-800 rounded-t-2xl">
-                    <TabButton id="it" label="Instrução de Trabalho (IT-MAN-001)" icon={<ClipboardListIcon className="w-4 h-4"/>} />
-                    <TabButton id="manual" label="Manual do Usuário" icon={<DocumentTextIcon className="w-4 h-4"/>} />
-                    <TabButton id="roi" label="Indicadores de Ganho (Estimativa)" icon={<ChartIcon className="w-4 h-4"/>} />
-                </div>
+        <div className="space-y-6">
+            <Header title="Sobre o SGMI 2.0" subtitle="Documentação, guias e benefícios do sistema." />
+            
+            <div className="bg-white dark:bg-gray-800 rounded-2xl p-2 border border-slate-200 shadow-sm flex gap-2">
+                <button onClick={() => setActiveTab('manual')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase ${activeTab === 'manual' ? 'bg-slate-100 text-blue-600' : 'text-slate-400'}`}>Manual do Usuário</button>
+                <button onClick={() => setActiveTab('it')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase ${activeTab === 'it' ? 'bg-slate-100 text-blue-600' : 'text-slate-400'}`}>Instrução de Trabalho</button>
+                <button onClick={() => setActiveTab('roi')} className={`flex-1 py-3 rounded-xl text-xs font-black uppercase ${activeTab === 'roi' ? 'bg-slate-100 text-blue-600' : 'text-slate-400'}`}>ROI & Otimização</button>
             </div>
 
-            {/* CONTEÚDO VISUALIZAÇÃO EM TELA - CAPTURADO PELO PDF */}
-            <div ref={contentRef} className="bg-white dark:bg-gray-800 p-8 rounded-b-3xl border border-gray-200 shadow-sm overflow-hidden animate-fade-in print-target">
-                {activeTab === 'it' && <ITSection />}
-                {activeTab === 'manual' && <ManualSection />}
-                {activeTab === 'roi' && <ROISection />}
+            <div ref={contentRef} className="animate-fade-in">
+                {renderContent()}
             </div>
         </div>
     );

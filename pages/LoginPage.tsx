@@ -1,9 +1,10 @@
-
 import React, { useState } from 'react';
+// FIX: Add missing icon and type imports
 import { ShieldCheckIcon, ArrowRightIcon } from '../components/icons';
+import { UserRole } from '../types';
 
 interface LoginPageProps {
-  onLogin: (success: boolean) => void;
+  onLogin: (role: UserRole) => void;
 }
 
 // Logo Polifluor reutilizável (CSS puro)
@@ -29,7 +30,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     setTimeout(() => {
         if (username === 'admin' && password === 'admin') {
             setError('');
-            onLogin(true);
+            onLogin('admin');
+        } else if (username === 'operador' && password === 'operador') {
+            setError('');
+            onLogin('operador');
         } else {
             setError('Credenciais inválidas. Tente novamente.');
             setIsLoading(false);
@@ -107,7 +111,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </form>
 
             <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center gap-2">
-                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                <p className="text-center text-xs text-gray-400">
+                    Use <strong className="text-gray-600">admin/admin</strong> para acesso total ou <strong className="text-gray-600">operador/operador</strong> para acesso limitado.
+                </p>
+                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 mt-2">
                     <ShieldCheckIcon className="w-4 h-4" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Conformidade IATF 16949</span>
                 </div>

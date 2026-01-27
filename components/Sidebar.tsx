@@ -1,11 +1,13 @@
 
+
+
 import React, { useMemo } from 'react';
 import { Page, MaintenanceStatus } from '../types';
 import { useAppContext } from '../contexts/AppContext';
 import { useDataContext } from '../contexts/DataContext';
 import {
     SettingsIcon, UsersIcon, InventoryIcon, PackageIcon, ClipboardListIcon,
-    ScheduleIcon, HomeIcon, ChartIcon, ShieldCheckIcon, SearchIcon,
+    ScheduleIcon, HomeIcon, ChartIcon, ShieldCheckIcon,
     WrenchIcon, InfoIcon, DocumentTextIcon, ShoppingCartIcon, RefreshIcon,
     TargetIcon, ChevronRightIcon, ChevronLeftIcon, DownloadIcon
 } from './icons';
@@ -19,8 +21,16 @@ const NavItem: React.FC<{
     isActive: boolean;
     isCollapsed: boolean;
     badge?: number;
-}> = ({ icon, label, page, onClick, isActive, isCollapsed, badge }) => {
+    badgeType?: 'notification' | 'info';
+}> = ({ icon, label, page, onClick, isActive, isCollapsed, badge, badgeType = 'notification' }) => {
     
+    const badgeColorClass = badgeType === 'notification' && badge && badge > 0
+        ? 'bg-[#D32F2F] text-white' 
+        : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300';
+
+    const showBadgeInExpanded = badge !== undefined;
+    const showBadgeAsNotification = badgeType === 'notification' && badge !== undefined && badge > 0;
+
     return (
         <li className="relative group">
             <button
@@ -44,13 +54,13 @@ const NavItem: React.FC<{
                     </span>
                 )}
 
-                {!isCollapsed && badge && badge > 0 ? (
-                    <span className="ml-auto bg-[#D32F2F] text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                {!isCollapsed && showBadgeInExpanded && (badgeType === 'info' || showBadgeAsNotification) ? (
+                    <span className={`ml-auto text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm ${badgeColorClass}`}>
                         {badge}
                     </span>
                 ) : null}
 
-                {isCollapsed && badge && badge > 0 ? (
+                {isCollapsed && showBadgeAsNotification ? (
                     <span className="absolute top-2 right-2 w-2 h-2 bg-[#D32F2F] rounded-full border border-white"></span>
                 ) : null}
             </button>
@@ -81,17 +91,23 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, onCloseMobile }) => {
-    const { currentPage, setCurrentPage } = useAppContext();
-    const { workOrders } = useDataContext();
+    const { currentPage, setCurrentPage, userRole } = useAppContext();
+    const { workOrders, equipmentData, equipmentTypes, inventoryData } = useDataContext();
 
     const delayedCount = useMemo(() => 
         workOrders.filter(o => o.status === MaintenanceStatus.Delayed).length, 
     [workOrders]);
+    
+    const assetCount = useMemo(() => equipmentData.length, [equipmentData]);
+    const assetTypeCount = useMemo(() => equipmentTypes.length, [equipmentTypes]);
+    const inventoryCount = useMemo(() => inventoryData.length, [inventoryData]);
 
     const handleNav = (page: Page) => {
         setCurrentPage(page);
         if (window.innerWidth < 768) onCloseMobile();
     };
+    
+    const isAdmin = userRole === 'admin';
 
     return (
         <aside className="flex flex-col h-full bg-white border-r border-slate-200 select-none">
@@ -115,37 +131,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggle, onClose
                 
                 <ul className="space-y-0.5">
                     <NavItem icon={<HomeIcon />} label="Visão Geral" page="home" onClick={() => handleNav('home')} isActive={currentPage === 'home'} isCollapsed={isCollapsed} />
-                    <NavItem icon={<ChartIcon />} label="Dashboard KPI" page="dashboard" onClick={() => handleNav('dashboard')} isActive={currentPage === 'dashboard'} isCollapsed={isCollapsed} />
+                    {isAdmin && <NavItem icon={<ChartIcon />} label="Dashboard KPI" page="dashboard" onClick={() => handleNav('dashboard')} isActive={currentPage === 'dashboard'} isCollapsed={isCollapsed} />}
                 </ul>
 
-                <SectionHeader title="Operacional" isCollapsed={isCollapsed} />
+                <SectionHeader title="Planejamento & Operações" isCollapsed={isCollapsed} />
                 <ul className="space-y-0.5">
                     <NavItem icon={<ClipboardListIcon />} label="Ordens de Serviço" page="work_orders" onClick={() => handleNav('work_orders')} isActive={currentPage === 'work_orders'} isCollapsed={isCollapsed} badge={delayedCount} />
-                    <NavItem icon={<TargetIcon />} label="Centro de Trabalho" page="work_center" onClick={() => handleNav('work_center')} isActive={currentPage === 'work_center'} isCollapsed={isCollapsed} />
-                    <NavItem icon={<ScheduleIcon />} label="Cronograma Mestre" page="schedule" onClick={() => handleNav('schedule')} isActive={currentPage === 'schedule'} isCollapsed={isCollapsed} />
+                    {isAdmin && <NavItem icon={<TargetIcon />} label="Planejamento" page="planning" onClick={() => handleNav('planning')} isActive={currentPage === 'planning'} isCollapsed={isCollapsed} />}
+                    <NavItem icon={<ScheduleIcon />} label="Cronograma" page="schedule" onClick={() => handleNav('schedule')} isActive={currentPage === 'schedule'} isCollapsed={isCollapsed} />
+                    {isAdmin && <NavItem icon={<PackageIcon />} label="Equipamentos" page="equipment" onClick={() => handleNav('equipment')} isActive={currentPage === 'equipment'} isCollapsed={isCollapsed} badge={assetCount} badgeType="info" />}
+                    {isAdmin && <NavItem icon={<WrenchIcon />} label="Tipos de Equipamento" page="equipment_types" onClick={() => handleNav('equipment_types')} isActive={currentPage === 'equipment_types'} isCollapsed={isCollapsed} badge={assetTypeCount} badgeType="info" />}
                 </ul>
 
-                <SectionHeader title="Gestão de Ativos" isCollapsed={isCollapsed} />
-                <ul className="space-y-0.5">
-                    <NavItem icon={<PackageIcon />} label="Equipamentos" page="equipment" onClick={() => handleNav('equipment')} isActive={currentPage === 'equipment'} isCollapsed={isCollapsed} />
-                    <NavItem icon={<WrenchIcon />} label="Tipos de Equipamento" page="equipment_types" onClick={() => handleNav('equipment_types')} isActive={currentPage === 'equipment_types'} isCollapsed={isCollapsed} />
-                    <NavItem icon={<InventoryIcon />} label="Estoque / Peças" page="inventory" onClick={() => handleNav('inventory')} isActive={currentPage === 'inventory'} isCollapsed={isCollapsed} />
-                    <NavItem icon={<ShoppingCartIcon />} label="Compras" page="purchasing" onClick={() => handleNav('purchasing')} isActive={currentPage === 'purchasing'} isCollapsed={isCollapsed} />
-                </ul>
+                {isAdmin && (
+                    <>
+                        <SectionHeader title="Recursos & Suprimentos" isCollapsed={isCollapsed} />
+                        <ul className="space-y-0.5">
+                            <NavItem icon={<InventoryIcon />} label="Almoxarifado" page="inventory" onClick={() => handleNav('inventory')} isActive={currentPage === 'inventory'} isCollapsed={isCollapsed} badge={inventoryCount} badgeType="info" />
+                            <NavItem icon={<ShoppingCartIcon />} label="Compras" page="purchasing" onClick={() => handleNav('purchasing')} isActive={currentPage === 'purchasing'} isCollapsed={isCollapsed} />
+                        </ul>
+                    </>
+                )}
 
                 <SectionHeader title="Qualidade & Reports" isCollapsed={isCollapsed} />
                 <ul className="space-y-0.5">
-                    <NavItem icon={<ShieldCheckIcon />} label="Conformidade IATF" page="quality" onClick={() => handleNav('quality')} isActive={currentPage === 'quality'} isCollapsed={isCollapsed} />
-                    <NavItem icon={<SearchIcon />} label="Busca Mestra" page="search_os" onClick={() => handleNav('search_os')} isActive={currentPage === 'search_os'} isCollapsed={isCollapsed} />
-                    <NavItem icon={<ChartIcon />} label="Relatórios Avançados" page="advanced_reports" onClick={() => handleNav('advanced_reports')} isActive={currentPage === 'advanced_reports'} isCollapsed={isCollapsed} />
-                     <NavItem icon={<TargetIcon />} label="Relatório Gerencial" page="managerial_report" onClick={() => handleNav('managerial_report')} isActive={currentPage === 'managerial_report'} isCollapsed={isCollapsed} />
-                     <NavItem icon={<DownloadIcon />} label="Exportar Dados" page="reports" onClick={() => handleNav('reports')} isActive={currentPage === 'reports'} isCollapsed={isCollapsed} />
+                    {isAdmin && <NavItem icon={<ShieldCheckIcon />} label="Conformidade IATF" page="quality" onClick={() => handleNav('quality')} isActive={currentPage === 'quality'} isCollapsed={isCollapsed} />}
+                    <NavItem icon={<WrenchIcon />} label="Histórico de Manutenção" page="history" onClick={() => handleNav('history')} isActive={currentPage === 'history'} isCollapsed={isCollapsed} />
+                    {isAdmin && <NavItem icon={<DownloadIcon />} label="Central de Relatórios" page="reports" onClick={() => handleNav('reports')} isActive={currentPage === 'reports'} isCollapsed={isCollapsed} />}
                 </ul>
 
                 <SectionHeader title="Sistema" isCollapsed={isCollapsed} />
                 <ul className="space-y-0.5">
-                    <NavItem icon={<SettingsIcon />} label="Configurações" page="settings" onClick={() => handleNav('settings')} isActive={currentPage === 'settings'} isCollapsed={isCollapsed} />
-                    <NavItem icon={<DocumentTextIcon />} label="Documentação" page="documentation" onClick={() => handleNav('documentation')} isActive={currentPage === 'documentation'} isCollapsed={isCollapsed} />
+                    {isAdmin && <NavItem icon={<SettingsIcon />} label="Configurações" page="settings" onClick={() => handleNav('settings')} isActive={currentPage === 'settings'} isCollapsed={isCollapsed} />}
+                    <NavItem icon={<DocumentTextIcon />} label="Central de Impressão" page="documentation" onClick={() => handleNav('documentation')} isActive={currentPage === 'documentation'} isCollapsed={isCollapsed} />
                      <NavItem icon={<InfoIcon />} label="Sobre o SGMI" page="information" onClick={() => handleNav('information')} isActive={currentPage === 'information'} isCollapsed={isCollapsed} />
                 </ul>
             </nav>

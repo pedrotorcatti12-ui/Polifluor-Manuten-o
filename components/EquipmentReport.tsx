@@ -1,4 +1,3 @@
-
 // components/EquipmentReport.tsx
 import React, { useState } from 'react';
 import { Equipment, MaintenanceTask } from '../types';
@@ -6,6 +5,7 @@ import { useMaintenanceMetrics } from '../hooks/useMaintenanceMetrics';
 import { CloseIcon, DownloadIcon, InfoIcon } from './icons';
 import { PrintableEquipmentReport } from './PrintableEquipmentReport';
 import { ReliabilityInfoModal } from './ReliabilityInfoModal';
+import { useDataContext } from '../contexts/DataContext';
 
 interface EquipmentReportProps {
   equipment: Equipment;
@@ -39,13 +39,21 @@ const MetricCard: React.FC<{ title: string; value: string | number; tooltip: str
 };
 
 export const EquipmentReport: React.FC<EquipmentReportProps> = ({ equipment, onClose }) => {
+    const { workOrders } = useDataContext();
+
     const availableYears = React.useMemo(() => {
-        const years = new Set(equipment.schedule.map(s => s.year));
+        // FIX: Explicitly set the Set type to <number> to ensure correct type inference for the sort function.
+        const years = new Set<number>(
+            workOrders
+                .filter(wo => wo.equipmentId === equipment.id && wo.scheduledDate)
+                .map(wo => new Date(wo.scheduledDate).getFullYear())
+                .filter(year => !isNaN(year))
+        );
         const currentYear = new Date().getFullYear();
         years.add(currentYear);
         years.add(2026);
-        return Array.from(years).filter(y => typeof y === 'number').sort((a: number, b: number) => b - a);
-    }, [equipment]);
+        return Array.from(years).sort((a, b) => b - a);
+    }, [equipment.id, workOrders]);
 
     const [viewYear, setViewYear] = useState(2026);
     const { metrics, executedTasks } = useMaintenanceMetrics(equipment, viewYear);
