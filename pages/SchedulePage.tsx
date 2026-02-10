@@ -1,17 +1,16 @@
+
 import React, { useState, useMemo } from 'react';
-import { Header } from '../components/Header';
 import { useDataContext } from '../contexts/DataContext';
 import { useAppContext } from '../contexts/AppContext';
 import { MONTHS, MAINTENANCE_TYPE_CONFIG } from '../constants';
 import { 
     ChevronLeftIcon, ChevronRightIcon, DownloadIcon, CloseIcon, SearchIcon, TargetIcon,
-    ClockIcon, CheckCircleIcon, ExclamationTriangleIcon 
 } from '../components/icons';
-import { WorkOrder, MaintenanceType, Equipment, MaintenanceStatus } from '../types';
+import { WorkOrder, Equipment, MaintenanceStatus } from '../types';
 import { Legend } from '../components/Legend';
-import { initialStatusConfig } from '../data/dataService';
 import { generateScheduleReport } from '../reports/reportGenerator';
 import { useDebounce } from '../hooks/useDebounce';
+import { ScheduleCell } from '../components/ScheduleCell';
 
 interface MonthOrdersModalProps {
     isOpen: boolean;
@@ -69,7 +68,6 @@ export const SchedulePage: React.FC = () => {
     const [modalInfo, setModalInfo] = useState<{ isOpen: boolean, orders: WorkOrder[], equipmentName: string, monthName: string }>({ isOpen: false, orders: [], equipmentName: '', monthName: '' });
 
     const debouncedSearchTerm = useDebounce(searchTerm, 300);
-    const statusMap = useMemo(() => new Map(initialStatusConfig.map(s => [s.label, s])), []);
 
     const filteredAndScheduledData = useMemo(() => {
         const filteredEquipment = equipmentData
@@ -78,33 +76,16 @@ export const SchedulePage: React.FC = () => {
             .filter(eq => (eq.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) || eq.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase())));
 
         const relevantOrders = workOrders.filter(order =>
-            (order.type === MaintenanceType.Preventive || order.type === MaintenanceType.Predictive || order.type === MaintenanceType.RevisaoPeriodica) &&
             new Date(order.scheduledDate).getFullYear() === viewYear
         );
 
         return filteredEquipment.map(eq => {
-            const monthlyTasks: { orders: WorkOrder[], statusIcon: React.ReactNode }[] = Array.from({ length: 12 }, () => ({ orders: [], statusIcon: null }));
+            const monthlyTasks: WorkOrder[][] = Array.from({ length: 12 }, () => []);
             
             relevantOrders.forEach(order => {
                 if (order.equipmentId === eq.id) {
                     const monthIndex = new Date(order.scheduledDate).getMonth();
-                    monthlyTasks[monthIndex].orders.push(order);
-                }
-            });
-
-            // Determine status icon for each month
-            monthlyTasks.forEach(month => {
-                if (month.orders.length > 0) {
-                    const hasDelayed = month.orders.some(o => o.status === MaintenanceStatus.Delayed);
-                    const allExecuted = month.orders.every(o => o.status === MaintenanceStatus.Executed);
-                    
-                    if (hasDelayed) {
-                        month.statusIcon = <ExclamationTriangleIcon className="w-4 h-4 text-rose-500" title="Contém O.S. Atrasada"/>;
-                    } else if (allExecuted) {
-                        month.statusIcon = <CheckCircleIcon className="w-4 h-4 text-emerald-500" title="Todas O.S. Executadas"/>;
-                    } else {
-                        month.statusIcon = <ClockIcon className="w-4 h-4 text-amber-500" title="O.S. Programada ou Em Campo"/>;
-                    }
+                    monthlyTasks[monthIndex].push(order);
                 }
             });
 
@@ -115,81 +96,70 @@ export const SchedulePage: React.FC = () => {
     const handleExportPdf = () => {
         const reportData = filteredAndScheduledData.map(item => ({
             equipment: item.equipment,
-            monthlyTasks: item.monthlyTasks.map(task => task.orders),
+            monthlyTasks: item.monthlyTasks,
         }));
         generateScheduleReport(reportData, viewYear);
     };
 
     return (
-        <div className="flex flex-col h-full space-y-6 animate-fade-in">
-            <Header
-                title="Cronograma Mestre Interativo"
-                subtitle="Dashboard de planejamento e controle de manutenções programadas."
-            />
-
-            {/* Cockpit de Controle */}
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-lg border border-slate-100 dark:border-gray-700 flex flex-col gap-4">
+        <div className="flex flex-col h-full space-y-4 animate-fade-in">
+            {/* Toolbar Estruturado */}
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-lg border border-slate-100 dark:border-gray-700 flex flex-col gap-4">
                 <div className="flex flex-wrap justify-between items-center gap-4">
-                     <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-xl">
-                        <button onClick={() => setViewYear(y => y - 1)} className="p-2 rounded-lg hover:bg-white"><ChevronLeftIcon className="w-5 h-5 text-slate-500"/></button>
-                        <span className="font-black text-lg text-slate-800 w-24 text-center">{viewYear}</span>
-                        <button onClick={() => setViewYear(y => y + 1)} className="p-2 rounded-lg hover:bg-white"><ChevronRightIcon className="w-5 h-5 text-slate-500"/></button>
+                    <h1 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Cronograma Mestre</h1>
+                    <div className="flex items-center gap-2 bg-slate-100 dark:bg-gray-900 p-1 rounded-xl">
+                        <button onClick={() => setViewYear(y => y - 1)} className="p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700"><ChevronLeftIcon className="w-5 h-5 text-slate-500"/></button>
+                        <span className="font-black text-lg text-slate-800 dark:text-white w-24 text-center">{viewYear}</span>
+                        <button onClick={() => setViewYear(y => y + 1)} className="p-2 rounded-lg hover:bg-white dark:hover:bg-gray-700"><ChevronRightIcon className="w-5 h-5 text-slate-500"/></button>
                     </div>
-                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-                        <button onClick={() => setFilterCritical(false)} className={`px-4 py-2 text-xs font-black uppercase rounded-lg ${!filterCritical ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>Todos Ativos</button>
-                        <button onClick={() => setFilterCritical(true)} className={`px-4 py-2 text-xs font-black uppercase rounded-lg flex items-center gap-1 ${filterCritical ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400'}`}><TargetIcon className="w-3 h-3"/> Apenas Críticos</button>
-                    </div>
-                    <button onClick={handleExportPdf} className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl transition-all text-xs uppercase tracking-widest shadow-lg">
-                        <DownloadIcon className="w-4 h-4"/> Exportar Visão (PDF)
-                    </button>
                 </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <select value={filterEqType} onChange={e => setFilterEqType(e.target.value)} className="form-input font-bold text-sm h-12 bg-slate-50 border-none rounded-xl">
-                        <option value="all">Filtrar por Família de Ativo...</option>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="relative md:col-span-1">
+                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"/>
+                        <input type="text" placeholder="Buscar por ativo..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full form-input pl-12 h-11 bg-slate-50 dark:bg-gray-900 border-none rounded-xl"/>
+                    </div>
+                    <select value={filterEqType} onChange={e => setFilterEqType(e.target.value)} className="form-input font-bold text-sm h-11 bg-slate-50 dark:bg-gray-900 border-none rounded-xl">
+                        <option value="all">Todas as Famílias</option>
                         {equipmentTypes.map(type => <option key={type.id} value={type.id}>{type.description}</option>)}
                     </select>
-                    <div className="relative">
-                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"/>
-                        <input type="text" placeholder="Buscar por nome ou ID do ativo..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full form-input pl-12 h-12 bg-slate-50 border-none rounded-xl"/>
+                    <div className="flex items-center gap-1 bg-slate-100 dark:bg-gray-900 p-1 rounded-xl">
+                        <button onClick={() => setFilterCritical(false)} className={`flex-1 h-full text-center px-4 py-2 text-xs font-black uppercase rounded-lg ${!filterCritical ? 'bg-white dark:bg-gray-700 text-blue-600 shadow-sm' : 'text-slate-400'}`}>Todos</button>
+                        <button onClick={() => setFilterCritical(true)} className={`flex-1 h-full text-center px-4 py-2 text-xs font-black uppercase rounded-lg flex items-center justify-center gap-1 ${filterCritical ? 'bg-white dark:bg-gray-700 text-orange-600 shadow-sm' : 'text-slate-400'}`}><TargetIcon className="w-3 h-3"/> Críticos</button>
                     </div>
                 </div>
+                 <div className="pt-4 border-t border-slate-100 dark:border-gray-700">
+                    <Legend />
+                 </div>
             </div>
 
             <div className="flex-1 bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-slate-100 dark:border-gray-700 overflow-auto custom-scrollbar">
-                <div className="min-w-[1400px]">
-                    <div className="grid grid-cols-[350px_repeat(12,_1fr)] sticky top-0 bg-slate-900 z-10">
-                        <div className="p-4 border-b border-slate-800 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-900">Ativo</div>
+                <div className="min-w-[1200px]">
+                    <div className="grid grid-cols-[300px_repeat(12,_1fr)] sticky top-0 bg-slate-900 z-10">
+                        <div className="p-4 border-b border-r border-slate-800 text-[10px] font-black text-slate-400 uppercase tracking-widest sticky left-0 bg-slate-900">Máquina \ Mês</div>
                         {MONTHS.map(month => (
-                            <div key={month} className="p-4 text-center border-b border-slate-800 text-[10px] font-black text-slate-400 uppercase">{month.substring(0, 3)}</div>
+                            <div key={month} className="p-4 text-center border-b border-r border-slate-800 text-[10px] font-black text-slate-400 uppercase">{month.substring(0, 3)}</div>
                         ))}
                     </div>
                     {filteredAndScheduledData.map(({ equipment, monthlyTasks }) => (
-                        <div key={equipment.id} className="grid grid-cols-[350px_repeat(12,_1fr)] group hover:bg-blue-50/30 dark:hover:bg-blue-900/20 border-b border-slate-100 dark:border-gray-800">
-                            <div className="p-4 truncate sticky left-0 bg-white dark:bg-gray-800 group-hover:bg-blue-50/30 dark:group-hover:bg-blue-900/20">
+                        <div key={equipment.id} className="grid grid-cols-[300px_repeat(12,_1fr)] group hover:bg-slate-50/50 dark:hover:bg-blue-900/10 border-b border-slate-100 dark:border-gray-800">
+                            <div className="p-4 truncate sticky left-0 bg-white dark:bg-gray-800 group-hover:bg-slate-50/50 dark:group-hover:bg-blue-900/10 border-r border-slate-100 dark:border-gray-800">
                                 <p className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-                                    {equipment.isCritical && <TargetIcon className="w-4 h-4 text-orange-500 flex-shrink-0" title="Ativo Crítico"/>}
+                                    {equipment.isCritical && (
+                                        <span title="Ativo Crítico" className="flex-shrink-0 flex">
+                                            <TargetIcon className="w-4 h-4 text-orange-500"/>
+                                        </span>
+                                    )}
                                     {equipment.name}
                                 </p>
                                 <p className="text-xs text-slate-400 font-mono">{equipment.id}</p>
                             </div>
-                            {monthlyTasks.map(({ orders, statusIcon }, monthIndex) => (
-                                <button
-                                    key={monthIndex}
-                                    onClick={() => orders.length > 0 && setModalInfo({ isOpen: true, orders, equipmentName: equipment.name, monthName: MONTHS[monthIndex] })}
-                                    className="border-l border-slate-100 dark:border-gray-800 flex items-center justify-center p-2 space-x-2 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/50 disabled:hover:bg-transparent"
-                                    disabled={orders.length === 0}
-                                    title={orders.map(o => `#${o.id}: ${o.type}`).join('\n')}
-                                >
-                                    {statusIcon}
-                                    <div className="flex items-center gap-1">
-                                    {Object.values(MaintenanceType).map(type => {
-                                        const count = orders.filter(o => o.type === type).length;
-                                        if (count === 0) return null;
-                                        const config = MAINTENANCE_TYPE_CONFIG[type];
-                                        return <div key={type} className={`w-2.5 h-2.5 rounded-full ${config.color}`} title={`${count}x ${type}`}></div>;
-                                    })}
-                                    </div>
-                                </button>
+                            {monthlyTasks.map((orders, monthIndex) => (
+                               <div key={monthIndex} className="border-r border-slate-100 dark:border-gray-800 flex items-center justify-center p-1">
+                                    <ScheduleCell 
+                                        orders={orders}
+                                        onClick={() => orders.length > 0 && setModalInfo({ isOpen: true, orders, equipmentName: equipment.name, monthName: MONTHS[monthIndex] })}
+                                    />
+                                </div>
                             ))}
                         </div>
                     ))}
@@ -199,7 +169,6 @@ export const SchedulePage: React.FC = () => {
                 </div>
             </div>
 
-            <Legend statusMap={statusMap} />
             {modalInfo.isOpen && <MonthOrdersModal {...modalInfo} onClose={() => setModalInfo(prev => ({ ...prev, isOpen: false }))} />}
         </div>
     );

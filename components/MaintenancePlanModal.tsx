@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
 import { MaintenancePlan, EquipmentType, TaskDetail, MaintenanceType, Equipment } from '../types';
-import { CloseIcon, PlusIcon, DeleteIcon, WrenchIcon, TargetIcon, ScheduleIcon } from './icons';
+import { CloseIcon, PlusIcon, DeleteIcon, WrenchIcon, TargetIcon, ScheduleIcon, ArrowPathIcon, CheckCircleIcon } from './icons';
 
 interface MaintenancePlanModalProps {
     isOpen: boolean;
@@ -8,24 +9,73 @@ interface MaintenancePlanModalProps {
     onSave: (plan: MaintenancePlan, applyToAll: boolean) => void;
     existingPlan: MaintenancePlan | null;
     equipmentTypes: EquipmentType[];
-    equipmentData: Equipment[]; // Adicionado para seleção específica
+    equipmentData: Equipment[]; 
 }
 
-// Lista de tarefas comuns para sugestão
+// Lista consolidada e unificada de sugestões de tarefas
 const COMMON_TASKS = [
-    "Limpeza geral do equipamento",
-    "Reaperto de contatos elétricos",
-    "Verificação do nível de óleo hidráulico",
-    "Verificação do nível de óleo lubrificante",
-    "Lubrificação de barramentos e fusos",
-    "Medição de corrente do motor principal",
-    "Verificar tensão das correias",
-    "Limpeza de filtros de ar do painel elétrico",
-    "Inspeção de vazamentos (óleo, ar, água)",
-    "Verificar funcionamento de botões de emergência",
-    "Inspeção de mangueiras e conexões",
-    "Calibração de sensores de temperatura",
-    "Teste de funcionamento de chaves de segurança"
+    "ANALIZAR CONDIÇÕES GERAIS DE FUNCIONAMENTO DO EQUIPAMENTO",
+    "APERTO DE TERMINAIS",
+    "EXECUTAR LIMPEZA INTERNA COM SOPRADOR DE AR",
+    "FAZER VISTORIA AO ELEMENTO COMPRESSOR E AO MOTOR PRINCIPAL",
+    "FAZER VISTORIA AO MOTOR DE ACIONAMENTO PRINCIPAL",
+    "INSPECIONAR O RESFRIADOR DE ÓLEO, LIMPAR SE NECESSÁRIO",
+    "INSPECIONAR TRAVAS E PARAFUSOS",
+    "LIMPEZA DO EQUIPAMENTO",
+    "LIMPEZA GERAL DO EQUIPAMENTO",
+    "LUBRIFICAÇÃO DE BARRAMENTOS E FUSOS",
+    "MEDIÇÃO DE CORRENTE DO MOTOR",
+    "REAPERTO CORREIAS DO MOTOR",
+    "REAPERTO DE CONTATOS ELÉTRICOS",
+    "REAPERTO DE PARAFUSOS",
+    "REMOVER E INSPECIONAR ELEMENTO FILTRANTE",
+    "ROLAMENTOS DE HÉLICE",
+    "SUBSTITUIR FILTRO DE ÓLEO",
+    "SUBSTITUIR FILTROS DE ENTRADA DE AR",
+    "SUBSTITUIR KIT DE VÁLVULA DE ADMISSÃO",
+    "SUBSTITUIR KIT DE VÁLVULA DE PRESSÃO MÍNIMA",
+    "SUBSTITUIR KIT DE VÁLVULA DE RETENÇÃO/CORTE DE ÓLEO",
+    "SUBSTITUIR KIT DE VÁLVULA DE TERMOSTÁTICA",
+    "SUBSTITUIR O ELEMENTO DO SEPARADOR DE ÓLEO",
+    "SUBSTITUIR PRÉ-FILTRO DO PAINEL",
+    "SUBSTITUIR VEDAÇÃO DE EIXO",
+    "TELA DE SUCCÇÃO",
+    "TROCA DE FILTRO DE AR",
+    "TROCA DE ÓLEO",
+    "VERIFICAÇÃO DE NÍVEL DE ÓLEO ANTES DA PARTIDA",
+    "VERIFICAÇÃO DE ROLAMENTOS",
+    "VERIFICAÇÃO DE TEMPERATURA",
+    "VERIFICAÇÃO DE VAZAMENTOS",
+    "VERIFICAR ASPECTO VISUAL E ESTRUTURAL DO EQUIPAMENTO",
+    "VERIFICAR BASE DO MOTOR",
+    "VERIFICAR CABOS DE SOLDA POSITIVO E NEGATIVO",
+    "VERIFICAR CILINDRO DE AR COMPRIDO (VASO DE PRESSÃO)",
+    "VERIFICAR CONTROLE DE PARÂMETROS MEDIDOS",
+    "VERIFICAR CORREIA",
+    "VERIFICAR DISCO",
+    "VERIFICAR ESTRUTURA METALICA GERAL",
+    "VERIFICAR FILTRO DE AR",
+    "VERIFICAR FILTRO DE COMBUSTIVEL",
+    "VERIFICAR FILTRO DO OLEO",
+    "VERIFICAR FILTRO SEPARADOR",
+    "VERIFICAR FILTROS SECOS",
+    "VERIFICAR INSTALAÇÃO ELÉTRICA",
+    "VERIFICAR MANGUEIRA DE CONDUÇÃO DE AGUA",
+    "VERIFICAR MANGUEIRA DE CONDUÇÃO DE GÁS",
+    "VERIFICAR MESA",
+    "VERIFICAR MOTOR",
+    "VERIFICAR MOTOR E BOMBA DÁGUA",
+    "VERIFICAR MOTOR E EXAUSTÃO",
+    "VERIFICAR OLEO",
+    "VERIFICAR PAINEL E CHAVE DE ACIONAMENTO",
+    "VERIFICAR PAINEL ELETRICO",
+    "VERIFICAR PROTEÇÕES",
+    "VERIFICAR PUXADOR",
+    "VERIFICAR REDUTOR DA ENGRENAGEM",
+    "VERIFICAR REFRIGERAÇÃO (COOLER, MANGUEIRAS, ABRAÇADEIRAS, LUZES DE ACIONAMENTO)",
+    "VERIFICAR RUIDO DOS ROLAMENTOS",
+    "VERIFICAR TOCHA DE SOLDAGEM",
+    "VERIFICAR VIDROS DO TETO DA CABINE"
 ];
 
 export const MaintenancePlanModal: React.FC<MaintenancePlanModalProps> = ({
@@ -36,6 +86,7 @@ export const MaintenancePlanModal: React.FC<MaintenancePlanModalProps> = ({
     const [frequency, setFrequency] = useState(1);
     const [startMonth, setStartMonth] = useState('Janeiro');
     const [tasks, setTasks] = useState<TaskDetail[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
     
     // Novo sistema de alvo
     const [targetType, setTargetType] = useState<'byType' | 'specific'>('byType');
@@ -57,7 +108,6 @@ export const MaintenancePlanModal: React.FC<MaintenancePlanModalProps> = ({
                 setTargetType('byType');
             }
         } else {
-            // Resetar para um novo plano
             setDescription('');
             setMaintenanceType(MaintenanceType.Preventive);
             setFrequency(1);
@@ -86,8 +136,13 @@ export const MaintenancePlanModal: React.FC<MaintenancePlanModalProps> = ({
 
     if (!isOpen) return null;
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setIsSaving(true);
+        
+        // Simular um pequeno delay para UX se for muito rápido, ou apenas para garantir o estado
+        await new Promise(r => setTimeout(r, 500));
+
         const planData: MaintenancePlan = {
             id: existingPlan?.id || crypto.randomUUID(),
             description,
@@ -98,7 +153,14 @@ export const MaintenancePlanModal: React.FC<MaintenancePlanModalProps> = ({
             equipmentTypeId: targetType === 'byType' ? equipmentTypeId : '',
             targetEquipmentIds: targetType === 'specific' ? targetEquipmentIds : []
         };
-        onSave(planData, false);
+        
+        try {
+            await onSave(planData, false);
+        } catch (error) {
+            console.error("Erro ao salvar plano:", error);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const sortedEquipment = [...equipmentData].sort((a,b) => a.id.localeCompare(b.id));
@@ -190,7 +252,7 @@ export const MaintenancePlanModal: React.FC<MaintenancePlanModalProps> = ({
                         </div>
                       <div className="space-y-2">
                         <datalist id="common-tasks">
-                            {COMMON_TASKS.map(task => <option key={task} value={task} />)}
+                            {COMMON_TASKS.sort().map((task, idx) => <option key={idx} value={task} />)}
                         </datalist>
                         {tasks.map((task, index) => (
                           <div key={index} className="flex items-center gap-2 group">
@@ -215,9 +277,10 @@ export const MaintenancePlanModal: React.FC<MaintenancePlanModalProps> = ({
                 </div>
 
                 <div className="flex justify-end p-6 border-t bg-slate-50">
-                    <button type="button" onClick={onClose} className="px-6 py-3 font-bold text-slate-400 uppercase text-xs tracking-widest">Cancelar</button>
-                    <button type="submit" className="px-8 py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase shadow-lg hover:bg-blue-700">
-                        {existingPlan ? 'Atualizar Plano' : 'Salvar Plano'}
+                    <button type="button" onClick={onClose} disabled={isSaving} className="px-6 py-3 font-bold text-slate-400 uppercase text-xs tracking-widest hover:text-slate-600 transition-colors disabled:opacity-50">Cancelar</button>
+                    <button type="submit" disabled={isSaving} className="flex items-center gap-2 px-8 py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase shadow-lg hover:bg-blue-700 transition-all disabled:bg-blue-400">
+                        {isSaving && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
+                        {isSaving ? 'Salvando...' : existingPlan ? 'Atualizar Plano' : 'Salvar Plano'}
                     </button>
                 </div>
             </form>

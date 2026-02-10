@@ -1,7 +1,6 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
-import { FlatTask } from '../types';
+import { FlatTask, MaintenanceType } from '../types';
 import { CloseIcon, ArrowPathIcon, CheckCircleIcon, ClipboardListIcon } from './icons';
 import { PrintableWorkOrder } from './PrintableWorkOrder';
 import { PrintableCorrectiveWorkOrder } from './PrintableCorrectiveWorkOrder';
@@ -107,6 +106,13 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose,
 
     if (!isOpen) return null;
 
+    // Helper para determinar se a tarefa atual deve usar o layout corretivo
+    const isCurrentTaskCorrective = () => {
+        if (currentIndex < 0 || currentIndex >= tasks.length) return false;
+        const type = tasks[currentIndex].task.type;
+        return type === MaintenanceType.Corrective || type === MaintenanceType.Predial || type === MaintenanceType.Melhoria;
+    };
+
     return (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-200">
@@ -177,7 +183,7 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose,
             <div className="fixed top-0 left-0 pointer-events-none opacity-0 -z-50">
                 <div ref={renderRef} className="bg-white" style={{ width: '210mm' }}>
                     {currentIndex >= 0 && currentIndex < tasks.length && (
-                        documentType === 'Corrective' ? (
+                        isCurrentTaskCorrective() ? (
                             <PrintableCorrectiveWorkOrder 
                                 taskData={tasks[currentIndex]} 
                                 osNumber={tasks[currentIndex].task.osNumber || '0000'} 

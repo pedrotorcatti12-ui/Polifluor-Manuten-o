@@ -19,9 +19,8 @@ import {
 } from '../components/icons';
 
 type DocumentType = 'Preventive' | 'Predictive' | 'Corrective';
-type FlowTab = 'to_print' | 'in_field' | 'to_verify' | 'received';
+type FlowTab = 'to_print' | 'in_field' | 'archived';
 
-// Converte um WorkOrder em uma FlatTask para compatibilidade de visualização
 const workOrderToFlatTask = (order: WorkOrder, equipment: Equipment): FlatTask => {
     const date = new Date(order.scheduledDate);
     return {
@@ -45,18 +44,15 @@ const workOrderToFlatTask = (order: WorkOrder, equipment: Equipment): FlatTask =
     };
 };
 
-
 export const DocumentationPage: React.FC = () => {
-    const { equipmentData, workOrders, revertTasksPreparation, handleUnifiedSave, showToast, markTasksAsPrepared } = useDataContext();
+    const { equipmentData, workOrders, markTasksAsPrepared, revertTasksPreparation } = useDataContext();
     const [selectedType, setSelectedType] = useState<DocumentType>('Preventive');
     const [activeFlow, setActiveFlow] = useState<FlowTab>('to_print');
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedMonth, setSelectedMonth] = useState<string>(MONTHS[new Date().getMonth()]);
-    const [selectedYear, setSelectedYear] = useState<number>(2026);
     
+    // Seleção Múltipla
     const [selectedTaskKeys, setSelectedTaskKeys] = useState<Set<string>>(new Set());
     const [isBulkPrintOpen, setIsBulkPrintOpen] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
     const [individualPrintTask, setIndividualPrintTask] = useState<FlatTask | null>(null);
 
     const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -81,25 +77,18 @@ export const DocumentationPage: React.FC = () => {
         };
 
         return allTasks.filter(item => {
-            if (item.year !== selectedYear) return false;
             if (!typeMap[selectedType].includes(item.task.type as MaintenanceType)) return false;
-            if (selectedMonth && item.task.month !== selectedMonth) return false;
             
             const { status, isPrepared } = item.task;
             
-            switch (activeFlow) {
-                case 'to_print':
-                    if (isPrepared || status === MaintenanceStatus.Executed || status === MaintenanceStatus.InField) return false;
-                    break;
-                case 'in_field':
-                    if (!isPrepared || status !== MaintenanceStatus.InField) return false;
-                    break;
-                case 'to_verify':
-                    if (status !== MaintenanceStatus.InField) return false;
-                    break;
-                case 'received':
-                    if (status !== MaintenanceStatus.Executed) return false;
-                    break;
+            if (activeFlow === 'to_print') {
+                if (status !== MaintenanceStatus.Scheduled && status !== MaintenanceStatus.Delayed) return false;
+                if (isPrepared) return false; 
+            } else if (activeFlow === 'in_field') {
+                if (!isPrepared && status !== MaintenanceStatus.InField) return false;
+                if (status === MaintenanceStatus.Executed) return false;
+            } else if (activeFlow === 'archived') {
+                if (status !== MaintenanceStatus.Executed) return false;
             }
 
             const term = debouncedSearchTerm.toLowerCase();
@@ -108,182 +97,161 @@ export const DocumentationPage: React.FC = () => {
                    item.equipment.id.toLowerCase().includes(term) ||
                    item.equipment.name.toLowerCase().includes(term);
         }).sort((a, b) => {
-            return (b.task.osNumber || '').localeCompare(a.task.osNumber || '', undefined, { numeric: true });
+            // Ordena por data (urgência)
+            return new Date(a.task.startDate || '').getTime() - new Date(b.task.startDate || '').getTime();
         });
-    }, [allTasks, selectedType, selectedMonth, selectedYear, debouncedSearchTerm, activeFlow]);
+    }, [allTasks, selectedType, debouncedSearchTerm, activeFlow]);
 
+    // Limpa seleção ao mudar de aba
     useEffect(() => {
         setSelectedTaskKeys(new Set());
-    }, [activeFlow, selectedType, selectedMonth, selectedYear]);
-    
-    const handleConfirmReturn = async (item: FlatTask) => {
-        const wo = workOrders.find(w => w.id === item.task.osNumber);
-        if(!wo) {
-            showToast("Ordem de Serviço não localizada para baixa.", "error");
-            return;
-        }
+    }, [activeFlow, selectedType]);
 
-        const updatedOrder: WorkOrder = {
-            ...wo,
-            status: MaintenanceStatus.Executed,
-            endDate: new Date().toISOString()
-        };
-        
-        const success = await handleUnifiedSave(updatedOrder);
-        if (success) {
-            showToast(`O.S. #${wo.id} finalizada com sucesso.`, "success");
-        }
-    };
-    
     const toggleSelection = (key: string) => {
         const newSelection = new Set(selectedTaskKeys);
-        if (newSelection.has(key)) {
-            newSelection.delete(key);
-        } else {
-            newSelection.add(key);
-        }
+        if (newSelection.has(key)) newSelection.delete(key);
+        else newSelection.add(key);
         setSelectedTaskKeys(newSelection);
     };
 
     const handleSelectAll = () => {
-        if (selectedTaskKeys.size === filteredTasks.length) {
-            setSelectedTaskKeys(new Set());
+        if (selectedTaskKeys.size === filteredTasks.length) setSelectedTaskKeys(new Set());
+        else setSelectedTaskKeys(new Set(filteredTasks.map(t => t.key)));
+    };
+
+    const handleManualMove = async () => {
+        const keys = Array.from(selectedTaskKeys);
+        if (activeFlow === 'to_print') {
+            if (confirm(`Confirmar que ${keys.length} ordens foram impressas? Elas serão movidas para "Em Campo".`)) {
+                await markTasksAsPrepared(keys);
+                setSelectedTaskKeys(new Set());
+            }
         } else {
-            setSelectedTaskKeys(new Set(filteredTasks.map(t => t.key)));
+            if (confirm(`Reverter ${keys.length} ordens para "A Imprimir"?`)) {
+                await revertTasksPreparation(keys);
+                setSelectedTaskKeys(new Set());
+            }
         }
     };
 
-    const handleBulkAction = (action: 'prepare' | 'revert') => {
-        setIsProcessing(true);
-        setTimeout(() => {
-            const keys = Array.from(selectedTaskKeys);
-            if (action === 'prepare') {
-                markTasksAsPrepared(keys);
-            } else {
-                revertTasksPreparation(keys);
-            }
-            setSelectedTaskKeys(new Set());
-            setIsProcessing(false);
-        }, 500);
-    };
-
     return (
-        <div className="space-y-4 animate-fade-in">
-            <Header title="Gestão de Documentação" subtitle="Controle de fluxo de Ordens de Serviço (Impressão -> Campo -> Retorno)." />
+        <div className="space-y-6 animate-fade-in pb-20">
+            <Header title="Central de Impressão e Documentação" subtitle="Controle o fluxo de papel: O que precisa ser impresso, o que está em campo e o que foi arquivado." />
 
-            <div className="flex bg-white dark:bg-gray-800 rounded-2xl p-1 border border-slate-200 dark:border-gray-700 shadow-sm">
-                {[
-                    { id: 'to_print', label: '1. Para Impressão', icon: <DocumentTextIcon className="w-4 h-4"/>, color: 'text-blue-600' },
-                    { id: 'in_field', label: '2. Em Campo', icon: <ClockIcon className="w-4 h-4"/>, color: 'text-orange-600' },
-                    { id: 'to_verify', label: '3. Para Conferência', icon: <SearchIcon className="w-4 h-4"/>, color: 'text-indigo-600' },
-                    { id: 'received', label: '4. Recebidas (Arquivar)', icon: <CheckCircleIcon className="w-4 h-4"/>, color: 'text-emerald-600' }
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => { setActiveFlow(tab.id as FlowTab); setSelectedTaskKeys(new Set()); }}
-                        className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-xl text-xs font-black uppercase transition-all ${activeFlow === tab.id ? 'bg-slate-100 dark:bg-gray-700 shadow-inner ' + tab.color : 'text-slate-400 hover:text-slate-600'}`}
-                    >
-                        {tab.icon} {tab.label}
-                    </button>
-                ))}
+            {/* SELETOR DE FLUXO (ABAS GRANDES) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <button
+                    onClick={() => setActiveFlow('to_print')}
+                    className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                        activeFlow === 'to_print' 
+                        ? 'bg-blue-600 border-blue-600 text-white shadow-lg transform scale-[1.02]' 
+                        : 'bg-white border-slate-200 text-slate-400 hover:border-blue-300'
+                    }`}
+                >
+                    <DocumentTextIcon className="w-8 h-8"/>
+                    <span className="font-black uppercase text-sm">1. Para Imprimir (Pendente)</span>
+                </button>
+                <button
+                    onClick={() => setActiveFlow('in_field')}
+                    className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                        activeFlow === 'in_field' 
+                        ? 'bg-orange-500 border-orange-500 text-white shadow-lg transform scale-[1.02]' 
+                        : 'bg-white border-slate-200 text-slate-400 hover:border-orange-300'
+                    }`}
+                >
+                    <ClockIcon className="w-8 h-8"/>
+                    <span className="font-black uppercase text-sm">2. Em Campo (Impresso)</span>
+                </button>
+                 <button
+                    onClick={() => setActiveFlow('archived')}
+                    className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                        activeFlow === 'archived' 
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg transform scale-[1.02]' 
+                        : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300'
+                    }`}
+                >
+                    <CheckCircleIcon className="w-8 h-8"/>
+                    <span className="font-black uppercase text-sm">3. Arquivadas (Executadas)</span>
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <div className="space-y-4">
-                    <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm">
-                        <h3 className="font-black text-[10px] uppercase text-slate-400 mb-4 tracking-widest">Filtrar por Natureza</h3>
-                        <div className="space-y-2">
-                            {(['Preventive', 'Predictive', 'Corrective'] as DocumentType[]).map(t => (
-                                <button key={t} onClick={() => { setSelectedType(t); }} className={`w-full text-left p-4 rounded-xl border-2 font-black text-[11px] uppercase transition-all ${selectedType === t ? 'bg-blue-600 text-white border-blue-600 shadow-lg' : 'bg-slate-50 text-slate-400 border-transparent'}`}>
-                                    {t === 'Preventive' ? 'Preventivas' : t === 'Predictive' ? 'Preditivas' : 'Corretivas'}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+            {/* BARRA DE FERRAMENTAS */}
+            <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4 items-center justify-between">
+                <div className="flex gap-2">
+                    {(['Preventive', 'Corrective', 'Predictive'] as DocumentType[]).map(t => (
+                        <button 
+                            key={t} 
+                            onClick={() => setSelectedType(t)} 
+                            className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase ${selectedType === t ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'}`}
+                        >
+                            {t === 'Preventive' ? 'Preventivas' : t === 'Corrective' ? 'Corretivas' : 'Preditivas'}
+                        </button>
+                    ))}
                 </div>
 
-                <div className="lg:col-span-3 space-y-4">
-                    <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-wrap gap-3 items-center">
-                        <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="form-input flex-1 font-bold border-slate-50 bg-slate-50 h-12 rounded-xl">
-                            <option value="">Todos os Meses</option>
-                            {MONTHS.map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
-                        <div className="relative flex-1 min-w-[200px]">
-                            <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                            <input type="text" placeholder="Buscar por Protocolo ou Máquina..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 h-12 form-input border-slate-50 bg-slate-50 rounded-xl" />
-                        </div>
+                <div className="flex items-center gap-4 flex-1 justify-end">
+                    <div className="relative w-64">
+                        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <input type="text" placeholder="Filtrar lista..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 h-10 form-input text-xs font-bold" />
                     </div>
+                    {activeFlow !== 'archived' && selectedTaskKeys.size > 0 && (
+                        <>
+                            {activeFlow === 'to_print' && (
+                                <button onClick={() => setIsBulkPrintOpen(true)} className="px-4 py-2 bg-blue-600 text-white font-black text-xs uppercase rounded-lg shadow-md hover:bg-blue-700 flex items-center gap-2">
+                                    <ClipboardListIcon className="w-4 h-4"/> Imprimir ({selectedTaskKeys.size})
+                                </button>
+                            )}
+                            <button onClick={handleManualMove} className="px-4 py-2 bg-slate-200 text-slate-600 font-black text-xs uppercase rounded-lg hover:bg-slate-300">
+                                {activeFlow === 'to_print' ? 'Marcar como Impresso (Manual)' : 'Voltar para Impressão'}
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
 
-                    <div className="bg-white dark:bg-gray-800 rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
-                        <div className="px-8 py-4 bg-slate-800 flex justify-between items-center text-[10px] font-black uppercase text-slate-300 tracking-widest">
-                            <div className="flex items-center gap-4">
-                                <input type="checkbox" onChange={handleSelectAll} checked={filteredTasks.length > 0 && selectedTaskKeys.size === filteredTasks.length} className="w-4 h-4 rounded" />
-                                <span>Lista de Documentos ({filteredTasks.length}) - Selecionados: {selectedTaskKeys.size}</span>
+            {/* LISTAGEM */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="p-3 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
+                    <input type="checkbox" onChange={handleSelectAll} checked={filteredTasks.length > 0 && selectedTaskKeys.size === filteredTasks.length} className="w-5 h-5 rounded border-slate-300" disabled={activeFlow === 'archived'} />
+                    <span className="text-xs font-bold text-slate-500 uppercase">Selecionar Todos ({filteredTasks.length})</span>
+                </div>
+                
+                <div className="max-h-[500px] overflow-y-auto">
+                    {filteredTasks.length > 0 ? filteredTasks.map(item => (
+                        <div key={item.key} className={`group p-4 border-b border-slate-100 flex items-center gap-4 hover:bg-slate-50 transition-colors ${selectedTaskKeys.has(item.key) ? 'bg-blue-50/50' : ''}`}>
+                            {activeFlow !== 'archived' && <input type="checkbox" checked={selectedTaskKeys.has(item.key)} onChange={() => toggleSelection(item.key)} className="w-5 h-5 rounded border-slate-300" />}
+                            
+                            <div className="w-12 h-12 bg-slate-100 rounded-lg flex flex-col items-center justify-center border border-slate-200">
+                                <span className="text-[8px] font-black uppercase text-slate-400">ID</span>
+                                <span className="text-sm font-black text-slate-700">{item.task.osNumber}</span>
                             </div>
-                             {activeFlow === 'to_print' && (
-                                <button onClick={() => handleBulkAction('prepare')} disabled={selectedTaskKeys.size === 0 || isProcessing} className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg text-[9px] hover:bg-orange-600 disabled:bg-slate-500">
-                                    {isProcessing ? <ArrowPathIcon className="w-3 h-3 animate-spin"/> : <ClockIcon className="w-3 h-3" />} Mover para "Em Campo"
-                                </button>
-                            )}
-                             {activeFlow === 'in_field' && (
-                                <button onClick={() => handleBulkAction('revert')} disabled={selectedTaskKeys.size === 0 || isProcessing} className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-lg text-[9px] hover:bg-rose-600 disabled:bg-slate-500">
-                                    {isProcessing ? <ArrowPathIcon className="w-3 h-3 animate-spin"/> : <RefreshIcon className="w-3 h-3" />} Reverter para Impressão
-                                </button>
-                            )}
-                        </div>
-                        
-                        <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y divide-slate-50">
-                            {filteredTasks.length > 0 ? filteredTasks.map(item => (
-                                <div key={item.key} className={`group px-8 py-4 transition-all flex items-center gap-6 hover:bg-blue-50/30 ${selectedTaskKeys.has(item.key) ? 'bg-blue-50' : ''}`}>
-                                    <input type="checkbox" checked={selectedTaskKeys.has(item.key)} onChange={() => toggleSelection(item.key)} className="w-5 h-5 rounded" />
-                                    <div className="flex-1 grid grid-cols-12 items-center gap-4">
-                                        <div className="col-span-2">
-                                            <div className="w-12 h-12 rounded-xl bg-blue-50 flex flex-col items-center justify-center border border-blue-100">
-                                                <span className="text-[7px] font-black text-blue-400 uppercase">OS</span>
-                                                <span className="text-sm font-black text-blue-700">#{item.task.osNumber}</span>
-                                            </div>
-                                        </div>
-                                        <div className="col-span-4">
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-sm font-black text-slate-800 dark:text-white uppercase">{item.equipment.id}</p>
-                                                {item.equipment.isCritical && <TargetIcon className="w-3 h-3 text-orange-500" />}
-                                            </div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase">{item.equipment.name}</p>
-                                        </div>
-                                        <div className="col-span-4">
-                                            <p className="text-[11px] font-medium text-slate-600 italic">"{item.task.description}"</p>
-                                        </div>
-                                        <div className="col-span-2 text-right flex items-center justify-end gap-2">
-                                            {activeFlow === 'to_verify' ? (
-                                                <button onClick={() => handleConfirmReturn(item)} className="px-3 py-2 bg-emerald-600 text-white font-bold text-[9px] uppercase rounded-lg hover:bg-emerald-700">
-                                                    Confirmar Retorno
-                                                </button>
-                                            ) : (
-                                                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${
-                                                    item.task.status === MaintenanceStatus.Executed ? 'bg-emerald-100 text-emerald-700' :
-                                                    item.task.status === MaintenanceStatus.InField ? 'bg-orange-100 text-orange-700' : 'text-slate-400'
-                                                }`}>
-                                                    {item.task.status === MaintenanceStatus.InField ? 'Em Campo' : item.task.status}
-                                                </span>
-                                            )}
-                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button onClick={(e) => { e.stopPropagation(); setIndividualPrintTask(item); }} className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg" title="Imprimir O.S.">
-                                                    <DocumentTextIcon className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
+
+                            <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-black text-slate-800 uppercase">{item.equipment.name}</h4>
+                                    {item.equipment.isCritical && <TargetIcon className="w-4 h-4 text-orange-500" />}
                                 </div>
-                            )) : (
-                                <div className="p-20 text-center text-slate-300 font-black uppercase tracking-widest">
-                                    Nenhum registro para exibir neste estágio
+                                <p className="text-xs text-slate-500 font-medium italic truncate max-w-lg">"{item.task.description}"</p>
+                                <div className="flex gap-4 mt-1">
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded uppercase">{item.task.type}</span>
+                                    <span className="text-[10px] font-bold text-slate-400">Prog: {new Date(item.task.startDate!).toLocaleDateString('pt-BR')}</span>
                                 </div>
-                            )}
+                            </div>
+
+                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onClick={() => setIndividualPrintTask(item)} className="px-3 py-1.5 bg-white border border-slate-300 text-slate-600 text-[10px] font-bold uppercase rounded-lg hover:bg-slate-100 shadow-sm">
+                                    Visualizar / Imprimir
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )) : (
+                        <div className="p-12 text-center text-slate-400 font-bold uppercase text-xs tracking-widest">
+                            Nenhum documento nesta caixa.
+                        </div>
+                    )}
                 </div>
             </div>
-            
+
             {isBulkPrintOpen && <BulkPrintModal isOpen={isBulkPrintOpen} onClose={() => setIsBulkPrintOpen(false)} tasks={filteredTasks.filter(t => selectedTaskKeys.has(t.key))} documentType={selectedType} />}
             {individualPrintTask && <PreviewWorkOrderModal isOpen={!!individualPrintTask} onClose={() => setIndividualPrintTask(null)} taskData={individualPrintTask} />}
         </div>
