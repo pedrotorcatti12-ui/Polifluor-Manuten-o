@@ -5,7 +5,7 @@ import { CloseIcon, ClockIcon, ExclamationTriangleIcon, TargetIcon, WrenchIcon, 
 interface CorrectiveRequestModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onCreate: (equipmentId: string, description: string, requester: string, priority: 'Alta' | 'Média' | 'Baixa', osNumber: string, category?: CorrectiveCategory, failureDateTime?: string, type?: MaintenanceType, location?: string) => void;
+    onCreate: (equipmentId: string, description: string, requester: string, priority: 'Alta' | 'Média' | 'Baixa', osNumber: string, category?: CorrectiveCategory, failureDateTime?: string, type?: MaintenanceType) => void;
     equipmentList: Equipment[];
     requesters: string[];
 }
@@ -20,8 +20,6 @@ export const CorrectiveRequestModal: React.FC<CorrectiveRequestModalProps> = ({
     const [isPredial, setIsPredial] = useState(false);
     const [equipmentId, setEquipmentId] = useState('');
     const [customAsset, setCustomAsset] = useState('');
-    const [location, setLocation] = useState('');
-    const [locationDisplay, setLocationDisplay] = useState('');
     const [description, setDescription] = useState('');
     const [emailRef, setEmailRef] = useState('');
     const [requester, setRequester] = useState('');
@@ -38,65 +36,43 @@ export const CorrectiveRequestModal: React.FC<CorrectiveRequestModalProps> = ({
     useEffect(() => {
         if (isPredial) {
             setEquipmentId('');
-            setLocationDisplay('');
             setMaintenanceType(MaintenanceType.Predial);
-            setCategory(CorrectiveCategory.Building);
             const hasRisk = PREDICAL_RISK_KEYWORDS.some(kw => description.toLowerCase().includes(kw));
             setShowRiskSuggestion(hasRisk);
         } else {
             setCustomAsset('');
-            setLocation('');
             setMaintenanceType(MaintenanceType.Corrective);
-            setCategory(CorrectiveCategory.Mechanical);
             setShowRiskSuggestion(false);
         }
     }, [isPredial, description]);
-
-    useEffect(() => {
-        if (!isPredial && equipmentId) {
-            const selectedEq = equipmentList.find(eq => eq.id === equipmentId);
-            setLocationDisplay(selectedEq?.location || 'Não especificado');
-        } else {
-            setLocationDisplay('');
-        }
-    }, [equipmentId, isPredial, equipmentList]);
 
     if (!isOpen) return null;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        
-        const finalId = isPredial ? 'ATIVO_PREDIAL_GENERICO' : equipmentId;
-        const finalDescription = isPredial ? `[Ativo: ${customAsset}] ${description}` : description;
-        const finalLocation = isPredial ? location : locationDisplay;
-
-        if (!finalId || !finalDescription || !requester || (isPredial && !location)) {
-            alert("Por favor, preencha todos os campos obrigatórios (*)");
-            return;
-        };
+        const finalId = isPredial ? `PREDIAL: ${customAsset}` : equipmentId;
+        if (!finalId || !description || !requester) return;
 
         const footer = emailRef ? `\n\n[REF E-MAIL: ${emailRef}]` : '';
         const externalTag = isExternalService ? '[SOLICITADO SERVIÇO EXTERNO] ' : '';
         
         onCreate(
             finalId, 
-            externalTag + finalDescription + footer, 
+            externalTag + description, 
             requester, 
             isEmergency ? 'Alta' : 'Média', 
             '', 
             category, 
             failureDateTime,
-            maintenanceType,
-            finalLocation
+            maintenanceType
         );
         onClose();
     };
     
-    const applyShortcut = (asset: string, desc: string, loc: string = '') => {
+    const applyShortcut = (asset: string, desc: string) => {
         setIsPredial(true);
         setCustomAsset(asset);
         setDescription(desc);
-        setLocation(loc);
     };
 
     return (
@@ -138,13 +114,13 @@ export const CorrectiveRequestModal: React.FC<CorrectiveRequestModalProps> = ({
                          <div className="bg-white p-4 rounded-xl border border-slate-100">
                              <h4 className="text-[10px] font-black uppercase text-slate-400 mb-2">Atalhos Comuns</h4>
                              <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => applyShortcut('Torneira/Tubulação', 'Vazamento.', 'Banheiro')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Vazamento</button>
-                                <button type="button" onClick={() => applyShortcut('Lâmpada/Reator', 'Iluminação não funciona.', 'Produção')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Iluminação</button>
-                                <button type="button" onClick={() => applyShortcut('Estrutura Metálica', 'Necessidade de adaptação ou reparo.', '')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Serralheria</button>
-                                <button type="button" onClick={() => applyShortcut('Ar Condicionado', 'Não está gelando ou apresenta vazamento.', 'Escritório')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Ar Condicionado</button>
-                                <button type="button" onClick={() => applyShortcut('Pintura', 'Necessidade de retoque ou pintura em parede/estrutura.', '')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Pintura</button>
-                                <button type="button" onClick={() => applyShortcut('Tomada/Disjuntor', 'Problema elétrico geral.', '')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Elétrica</button>
-                                <button type="button" onClick={() => applyShortcut('Parede/Piso', 'Reparo em alvenaria.', '')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Alvenaria</button>
+                                <button type="button" onClick={() => applyShortcut('Banheiro', 'Vazamento em tubulação/torneira do banheiro.')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Vazamento</button>
+                                <button type="button" onClick={() => applyShortcut('Iluminação', 'Lâmpada queimada ou problema no circuito de iluminação.')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Iluminação</button>
+                                <button type="button" onClick={() => applyShortcut('Serralheria', 'Necessidade de adaptação ou reparo em estrutura metálica.')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Serralheria</button>
+                                <button type="button" onClick={() => applyShortcut('Ar Condicionado', 'Ar condicionado não está gelando ou apresenta vazamento.')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Ar Condicionado</button>
+                                <button type="button" onClick={() => applyShortcut('Pintura', 'Necessidade de retoque ou pintura em parede/estrutura.')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Pintura</button>
+                                <button type="button" onClick={() => applyShortcut('Elétrica Predial', 'Tomada não funciona, disjuntor desarmando ou outro problema elétrico.')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Elétrica</button>
+                                <button type="button" onClick={() => applyShortcut('Alvenaria', 'Reparo em parede, piso ou outra estrutura.')} className="text-xs font-bold text-slate-600 bg-slate-100 p-2 rounded-lg border border-slate-200 hover:bg-slate-200">Alvenaria</button>
                              </div>
                          </div>
                     )}
@@ -153,8 +129,8 @@ export const CorrectiveRequestModal: React.FC<CorrectiveRequestModalProps> = ({
                         <div>
                             {isPredial ? (
                                 <>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Ativo Predial *</label>
-                                    <input type="text" value={customAsset} onChange={e => setCustomAsset(e.target.value)} required={isPredial} className="w-full h-12 form-input font-black" placeholder="Ex: Telhado Galpão A, Janela" />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Local/Ativo Predial *</label>
+                                    <input type="text" value={customAsset} onChange={e => setCustomAsset(e.target.value)} required={isPredial} className="w-full h-12 form-input font-black" placeholder="Ex: Telhado Galpão A, Banheiro" />
                                 </>
                             ) : (
                                 <>
@@ -167,12 +143,8 @@ export const CorrectiveRequestModal: React.FC<CorrectiveRequestModalProps> = ({
                             )}
                         </div>
                         <div>
-                           <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Localização *</label>
-                           {isPredial ? (
-                               <input type="text" value={location} onChange={e => setLocation(e.target.value)} required className="w-full h-12 form-input font-bold" placeholder="Ex: Banheiro Executivo" />
-                           ) : (
-                               <input type="text" value={locationDisplay} readOnly className="w-full h-12 form-input font-bold bg-slate-100" />
-                           )}
+                            <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Referência de E-mail / Cotação</label>
+                            <input type="text" value={emailRef} onChange={e => setEmailRef(e.target.value)} placeholder="Ex: E-mail Prensas 04/06" className="w-full h-12 form-input font-bold" />
                         </div>
                     </div>
 
@@ -181,17 +153,11 @@ export const CorrectiveRequestModal: React.FC<CorrectiveRequestModalProps> = ({
                         <textarea value={description} onChange={e => setDescription(e.target.value)} required rows={4} placeholder="Ex: Vazamento no pistão, bico entupido..." className="w-full p-4 form-input font-bold" />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-6">
-                        <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Categoria da Falha *</label>
-                            <select value={category} onChange={e => setCategory(e.target.value as CorrectiveCategory)} required className="w-full h-12 form-input font-black" disabled={isPredial}>
-                               {Object.values(CorrectiveCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                            </select>
-                        </div>
-                         <div>
-                            <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Referência de E-mail / Cotação</label>
-                            <input type="text" value={emailRef} onChange={e => setEmailRef(e.target.value)} placeholder="Ex: E-mail Prensas 04/06" className="w-full h-12 form-input font-bold" />
-                        </div>
+                    <div>
+                        <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Categoria da Falha *</label>
+                        <select value={category} onChange={e => setCategory(e.target.value as CorrectiveCategory)} required className="w-full h-12 form-input font-black">
+                           {Object.values(CorrectiveCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
                     </div>
                     
                     {showRiskSuggestion && (

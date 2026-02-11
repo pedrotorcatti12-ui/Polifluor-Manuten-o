@@ -1,12 +1,5 @@
-
 // FIX: Add UserRole, AssetCategory, CorrectiveCategory and other enums/types
-export type UserRole = 'admin' | 'gestor' | 'manutencista' | 'operador';
-
-export interface User {
-    username: string;
-    name: string;
-    role: UserRole;
-}
+export type UserRole = 'admin' | 'operador';
 
 export enum MaintenanceStatus {
     Scheduled = 'Programado',
@@ -72,7 +65,6 @@ export interface WorkOrder {
     type: MaintenanceType;
     status: MaintenanceStatus;
     scheduledDate: string;
-    startDateExecution?: string; // Added field
     endDate?: string; 
     description: string;
     checklist?: TaskDetail[];
@@ -84,7 +76,6 @@ export interface WorkOrder {
     rootCause?: string;
     correctiveCategory?: CorrectiveCategory;
     machineStopped?: boolean;
-    isApproved?: boolean; // Added field
     manHours?: ManHourEntry[];
     materialsUsed?: { partId: string; quantity: number }[];
     purchaseRequests?: PurchaseRequest[];
@@ -103,7 +94,7 @@ export interface Equipment {
   // Added properties
   location?: string;
   category?: AssetCategory;
-  status?: 'Ativo' | 'Inativo' | 'Desativado'; // Updated type
+  status?: 'Ativo' | 'Inativo';
   model?: string; 
   yearOfManufacture?: string;
   isCritical?: boolean;

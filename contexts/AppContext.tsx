@@ -1,6 +1,5 @@
-
 import React, { createContext, useState, useContext, ReactNode } from 'react';
-import { Page, WorkOrder, MaintenancePlan, UserRole, User } from '../types';
+import { Page, WorkOrder, MaintenancePlan, UserRole } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface AppContextType {
@@ -18,8 +17,7 @@ interface AppContextType {
     setEditingPlan: (plan: MaintenancePlan | null) => void;
 
     userRole: UserRole | null;
-    currentUser: User | null; // Adicionado para saber QUEM é o usuário (Darci, Sergio, Marcos)
-    handleLogin: (user: User) => void;
+    handleLogin: (role: UserRole) => void;
     handleLogout: () => void;
     theme: 'light' | 'dark';
     setTheme: (theme: 'light' | 'dark') => void;
@@ -38,19 +36,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [editingPlan, setEditingPlan] = useState<MaintenancePlan | null>(null);
 
     const [userRole, setUserRole] = useState<UserRole | null>(null);
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-    
     const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('sgmi-theme', 'light');
 
-    const handleLogin = (user: User) => {
-        setUserRole(user.role);
-        setCurrentUser(user);
+    const handleLogin = (role: UserRole) => {
+        setUserRole(role);
         setCurrentPage('home');
     };
 
     const handleLogout = () => {
         setUserRole(null); 
-        setCurrentUser(null);
     };
 
     const requestAdminPassword = (callback: () => void) => {
@@ -67,7 +61,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             isPlanModalOpen, setIsPlanModalOpen,
             editingPlan, setEditingPlan,
             userRole,
-            currentUser,
             handleLogin,
             handleLogout,
             theme,

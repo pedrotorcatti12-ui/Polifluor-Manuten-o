@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { WorkOrder, Equipment, MaintenanceStatus, MaintenanceType, TaskDetail } from '../types';
-import { CloseIcon, PlusIcon, DeleteIcon } from './icons';
+import { CloseIcon } from './icons';
 
 interface WorkOrderModalProps {
     isOpen: boolean;
@@ -13,7 +12,6 @@ interface WorkOrderModalProps {
 
 export const WorkOrderModal: React.FC<WorkOrderModalProps> = ({ isOpen, onClose, onSave, existingOrder, equipmentData }) => {
     const [order, setOrder] = useState<WorkOrder | null>(null);
-    const [newTaskAction, setNewTaskAction] = useState('');
 
     useEffect(() => {
         if (existingOrder) {
@@ -44,20 +42,6 @@ export const WorkOrderModal: React.FC<WorkOrderModalProps> = ({ isOpen, onClose,
             index === indexToToggle ? { ...item, checked: !item.checked } : item
         );
         handleFieldChange('checklist', newChecklist);
-    };
-
-    const handleAddTask = () => {
-        if (!newTaskAction.trim() || !order) return;
-        const newTask: TaskDetail = { action: newTaskAction.trim(), checked: false };
-        const updatedChecklist = [...(order.checklist || []), newTask];
-        handleFieldChange('checklist', updatedChecklist);
-        setNewTaskAction('');
-    };
-
-    const handleRemoveTask = (indexToRemove: number) => {
-        if (!order || !order.checklist) return;
-        const updatedChecklist = order.checklist.filter((_, index) => index !== indexToRemove);
-        handleFieldChange('checklist', updatedChecklist);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -112,55 +96,19 @@ export const WorkOrderModal: React.FC<WorkOrderModalProps> = ({ isOpen, onClose,
                         </div>
                     </div>
 
-                    <div>
-                        <h3 className="text-sm font-medium text-gray-700 mb-2">Checklist de Tarefas</h3>
-                        
-                        <div className="flex gap-2 mb-2">
-                            <input 
-                                type="text" 
-                                value={newTaskAction}
-                                onChange={(e) => setNewTaskAction(e.target.value)}
-                                placeholder="Nova tarefa..."
-                                className="flex-1 form-input text-sm"
-                                onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTask())}
-                            />
-                            <button 
-                                type="button" 
-                                onClick={handleAddTask}
-                                className="p-2 bg-blue-100 text-blue-600 rounded hover:bg-blue-200"
-                                title="Adicionar Tarefa"
-                            >
-                                <PlusIcon className="w-5 h-5" />
-                            </button>
+                    {order.checklist && order.checklist.length > 0 && (
+                        <div>
+                            <h3 className="text-sm font-medium text-gray-700 mb-2">Checklist de Tarefas</h3>
+                            <div className="space-y-2 p-3 bg-gray-50 rounded-md border max-h-48 overflow-y-auto">
+                                {order.checklist.map((item, index) => (
+                                    <label key={index} className="flex items-center gap-3 p-2 bg-white rounded border">
+                                        <input type="checkbox" checked={item.checked} onChange={() => handleChecklistItemToggle(index)} className="w-5 h-5 text-blue-600 rounded" />
+                                        <span className={`text-sm ${item.checked ? 'line-through text-gray-400' : 'text-gray-700'}`}>{item.action}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
-
-                        <div className="space-y-2 p-3 bg-gray-50 rounded-md border max-h-48 overflow-y-auto">
-                            {(order.checklist || []).map((item, index) => (
-                                <div key={index} className="flex items-center gap-2 p-2 bg-white rounded border group">
-                                    <input 
-                                        type="checkbox" 
-                                        checked={item.checked} 
-                                        onChange={() => handleChecklistItemToggle(index)} 
-                                        className="w-5 h-5 text-blue-600 rounded" 
-                                    />
-                                    <span className={`flex-1 text-sm ${item.checked ? 'line-through text-gray-400' : 'text-gray-700'}`}>
-                                        {item.action}
-                                    </span>
-                                    <button 
-                                        type="button" 
-                                        onClick={() => handleRemoveTask(index)}
-                                        className="text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                        title="Remover"
-                                    >
-                                        <DeleteIcon className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            ))}
-                            {(!order.checklist || order.checklist.length === 0) && (
-                                <p className="text-xs text-gray-400 text-center italic">Nenhuma tarefa.</p>
-                            )}
-                        </div>
-                    </div>
+                    )}
                     
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Observações</label>

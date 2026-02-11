@@ -33,7 +33,7 @@ BEGIN
         -- Itera sobre os meses do ano, aplicando a frequência do plano
         FOR month_index IN start_month_index..11 BY plan_record.frequency LOOP
             
-            -- REGRA ADICIONADA: Ignorar o mês de Janeiro (índice 0) para preservar o histórico real.
+            -- REGRA ADICIONADA: Ignorar o mês de Janeiro (índice 0)
             IF month_index = 0 THEN
                 CONTINUE;
             END IF;
@@ -47,7 +47,7 @@ BEGIN
                 WHERE id = ANY(plan_record.target_equipment_ids)
             LOOP
                 -- Regra de Negócio: Ignorar ativos que são da categoria 'Predial' (CORRIGIDO)
-                IF equipment_record.category = 'Predial/Utilitário' THEN
+                IF equipment_record.category = 'Predial' THEN
                     CONTINUE;
                 END IF;
 

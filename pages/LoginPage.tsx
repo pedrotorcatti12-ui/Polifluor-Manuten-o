@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
-import { ShieldCheckIcon, ArrowRightIcon, UsersIcon } from '../components/icons';
-import { UserRole, User } from '../types';
+// FIX: Add missing icon and type imports
+import { ShieldCheckIcon, ArrowRightIcon } from '../components/icons';
+import { UserRole } from '../types';
 
 interface LoginPageProps {
-  onLogin: (user: User) => void;
+  onLogin: (role: UserRole) => void;
 }
 
 // Logo Polifluor reutilizável (CSS puro)
@@ -26,48 +26,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulação de autenticação com os novos perfis
+    // Simulação de delay de rede para UX
     setTimeout(() => {
-        const u = username.toLowerCase().trim();
-        const p = password.trim();
-
-        // 1. ADMINISTRAÇÃO (Senha Numérica - Ex: 123456)
-        if ((u === 'juliana' || u === 'leandro' || u === 'pedro') && p === '123456') {
-            onLogin({ 
-                username: u, 
-                name: u.charAt(0).toUpperCase() + u.slice(1), 
-                role: 'admin' 
-            });
-        }
-        // 2. GESTOR (Marcos Amato - Sem poder de exclusão)
-        else if (u === 'marcos' && p === 'marcos') {
-            onLogin({ 
-                username: 'marcos', 
-                name: 'Marcos Amato', 
-                role: 'gestor' 
-            });
-        }
-        // 3. MANUTENCISTAS (Darci / Sergio)
-        else if (u === 'darci' && p === 'darci') {
-            onLogin({ 
-                username: 'darci', 
-                name: 'Darci', 
-                role: 'manutencista' 
-            });
-        }
-        else if (u === 'sergio' && p === 'sergio') {
-            onLogin({ 
-                username: 'sergio', 
-                name: 'Sergio Lacerda', 
-                role: 'manutencista' 
-            });
-        }
-        // Fallback para testes (manter se necessário)
-        else if (u === 'admin' && p === 'admin') {
-             onLogin({ username: 'admin', name: 'Administrador', role: 'admin' });
-        }
-        else {
-            setError('Credenciais inválidas. Verifique usuário e senha.');
+        if (username === 'admin' && password === 'admin') {
+            setError('');
+            onLogin('admin');
+        } else if (username === 'operador' && password === 'operador') {
+            setError('');
+            onLogin('operador');
+        } else {
+            setError('Credenciais inválidas. Tente novamente.');
             setIsLoading(false);
         }
     }, 800);
@@ -93,24 +61,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
             <form className="space-y-5" onSubmit={handleLogin}>
                 <div>
-                    <label htmlFor="username" className="block text-xs font-black text-slate-500 uppercase mb-1 ml-1">Usuário</label>
-                    <div className="relative">
-                        <UsersIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-300" />
-                        <input
-                            id="username"
-                            name="username"
-                            type="text"
-                            autoComplete="username"
-                            required
-                            className="w-full h-12 pl-11 pr-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-[#D32F2F] focus:ring-1 focus:ring-[#D32F2F] transition-all uppercase"
-                            placeholder="SEU NOME (EX: PEDRO)"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                        />
-                    </div>
+                    <label htmlFor="username" className="block text-xs font-black text-slate-500 uppercase mb-1 ml-1">Usuário Corporativo</label>
+                    <input
+                        id="username"
+                        name="username"
+                        type="text"
+                        autoComplete="username"
+                        required
+                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:outline-none focus:border-[#D32F2F] focus:ring-1 focus:ring-[#D32F2F] transition-all"
+                        placeholder="Ex: admin"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                    />
                 </div>
                 <div>
-                    <label htmlFor="password" className="block text-xs font-black text-slate-500 uppercase mb-1 ml-1">Senha</label>
+                    <label htmlFor="password" className="block text-xs font-black text-slate-500 uppercase mb-1 ml-1">Senha de Acesso</label>
                     <input
                         id="password"
                         name="password"
@@ -139,13 +104,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
                         <span className="animate-pulse">Autenticando...</span>
                     ) : (
                         <>
-                            Entrar no Sistema <ArrowRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                            Acessar Painel <ArrowRightIcon className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                         </>
                     )}
                 </button>
             </form>
 
             <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center gap-2">
+                <p className="text-center text-xs text-gray-400">
+                    Use <strong className="text-gray-600">admin/admin</strong> para acesso total ou <strong className="text-gray-600">operador/operador</strong> para acesso limitado.
+                </p>
                 <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 mt-2">
                     <ShieldCheckIcon className="w-4 h-4" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Conformidade IATF 16949</span>

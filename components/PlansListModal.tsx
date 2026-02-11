@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { MaintenancePlan, EquipmentType } from '../types';
 import { CloseIcon, EditIcon, PlusIcon, DeleteIcon, ArrowPathIcon } from './icons';
@@ -39,6 +40,7 @@ export const PlansListModal: React.FC<PlansListModalProps> = ({
   const filteredPlans = plans.filter(p => {
     const term = searchTerm.toLowerCase();
     const description = (p.description || '').toLowerCase();
+    // FIX: Correct property name from equipment_type_id to equipmentTypeId
     const typeId = (p.equipmentTypeId || '').toLowerCase();
     
     return description.includes(term) || typeId.includes(term);
@@ -111,33 +113,29 @@ export const PlansListModal: React.FC<PlansListModalProps> = ({
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Aplica-se a (Tipo)</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mês Início</th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Frequência</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-64">Tarefas Principais</th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tarefas</th>
                         <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ações</th>
                     </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                     {filteredPlans.map(plan => (
                         <tr key={plan.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white align-top">{plan.description}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400 align-top">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">{plan.description}</td>
+                            <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                                 <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-xs font-bold">
+                                    {/* FIX: Correct property name from equipment_type_id to equipmentTypeId */}
                                     {getTypeName(plan.equipmentTypeId)}
                                 </span>
                             </td>
-                            <td className="px-6 py-4 text-sm font-bold align-top">{plan.startMonth}</td>
-                            <td className="px-6 py-4 text-sm text-center align-top">
+                            <td className="px-6 py-4 text-sm font-bold">{plan.startMonth}</td>
+                            <td className="px-6 py-4 text-sm text-center">
                                 <span className="font-bold text-gray-800 dark:text-white">{plan.frequency}</span>
                                 <span className="text-gray-500 text-xs ml-1">meses</span>
                             </td>
-                            <td className="px-6 py-4 text-xs text-gray-500 align-top">
-                                <ul className="list-disc pl-4 space-y-1">
-                                    {(plan.tasks || []).slice(0, 3).map((t, idx) => (
-                                        <li key={idx} className="truncate max-w-[200px]" title={t.action}>{t.action}</li>
-                                    ))}
-                                    {(plan.tasks || []).length > 3 && <li className="text-slate-400 italic">...e mais {(plan.tasks?.length || 0) - 3} itens</li>}
-                                </ul>
+                            <td className="px-6 py-4 text-sm text-center text-gray-500">
+                                {plan.tasks?.length || 0} itens
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium align-top">
+                            <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                                 <div className="flex justify-center items-center space-x-2">
                                     <button onClick={() => onEdit(plan)} className="p-2 text-gray-500 hover:text-blue-500" title="Editar Periodicidade e Tarefas">
                                         <EditIcon className="w-5 h-5" />

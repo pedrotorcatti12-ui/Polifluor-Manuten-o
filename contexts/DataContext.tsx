@@ -1,20 +1,21 @@
-
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { useToast } from './ToastContext';
 import { Equipment, WorkOrder, MaintenanceStatus, MaintenanceType, EquipmentType, MaintenancePlan, SparePart, StockMovement, AssetCategory, CorrectiveCategory } from '../types';
 import { supabase } from '../supabaseClient';
 
 // --- MAPPERS (ADAPTADORES DE DADOS) ---
+// Convertem o formato do Banco (snake_case) para a Aplicação (camelCase)
+
 const mapEquipmentFromDB = (data: any): Equipment => ({
     id: data.id,
     name: data.name,
-    typeId: data.type_id,
+    typeId: data.type_id, // DB: type_id -> App: typeId
     location: data.location,
     category: data.category as AssetCategory,
     status: data.status,
     model: data.model,
-    yearOfManufacture: data.year_of_manufacture,
-    isCritical: data.is_critical,
+    yearOfManufacture: data.year_of_manufacture, // DB: year_of_manufacture
+    isCritical: data.is_critical, // DB: is_critical
     preservationNotes: data.preservation_notes,
     customerSpecificRequirements: data.customer_specific_requirements,
     customPlanId: data.custom_plan_id,
@@ -45,8 +46,8 @@ const mapPartFromDB = (data: any): SparePart => ({
     location: data.location,
     unit: data.unit,
     cost: data.cost,
-    minStock: data.min_stock,
-    currentStock: data.current_stock
+    minStock: data.min_stock, // DB: min_stock
+    currentStock: data.current_stock // DB: current_stock
 });
 
 const mapPartToDB = (data: SparePart) => ({
@@ -65,7 +66,6 @@ const mapWorkOrderFromDB = (data: any): WorkOrder => ({
     type: data.type as MaintenanceType,
     status: data.status as MaintenanceStatus,
     scheduledDate: data.scheduled_date,
-    startDateExecution: data.start_date_execution,
     endDate: data.end_date,
     description: data.description,
     checklist: data.checklist,
@@ -75,7 +75,6 @@ const mapWorkOrderFromDB = (data: any): WorkOrder => ({
     rootCause: data.root_cause,
     correctiveCategory: data.corrective_category as CorrectiveCategory,
     machineStopped: data.machine_stopped,
-    isApproved: data.is_approved,
     manHours: data.man_hours,
     materialsUsed: data.materials_used,
     purchaseRequests: data.purchase_requests,
@@ -83,17 +82,19 @@ const mapWorkOrderFromDB = (data: any): WorkOrder => ({
     reportPdfBase64: data.report_pdf_base64,
     isPrepared: data.is_prepared,
     deleted_at: data.deleted_at,
+    // Se vier join, mapeia o equipamento também
     equipments: data.equipments ? mapEquipmentFromDB(data.equipments) : null
 });
 
 const mapWorkOrderToDB = (data: WorkOrder) => {
+    // Remove propriedades de join ou UI-only antes de enviar
     const { equipments, ...rest } = data; 
-    const payload: any = {
+    return {
+        id: rest.id,
         equipment_id: rest.equipmentId,
         type: rest.type,
         status: rest.status,
         scheduled_date: rest.scheduledDate,
-        start_date_execution: rest.startDateExecution,
         end_date: rest.endDate,
         description: rest.description,
         checklist: rest.checklist,
@@ -103,7 +104,6 @@ const mapWorkOrderToDB = (data: WorkOrder) => {
         root_cause: rest.rootCause,
         corrective_category: rest.correctiveCategory,
         machine_stopped: rest.machineStopped,
-        is_approved: rest.isApproved,
         man_hours: rest.manHours,
         materials_used: rest.materialsUsed,
         purchase_requests: rest.purchaseRequests,
@@ -112,10 +112,6 @@ const mapWorkOrderToDB = (data: WorkOrder) => {
         is_prepared: rest.isPrepared,
         deleted_at: rest.deleted_at
     };
-    if (rest.id && rest.id.trim() !== '') {
-        payload.id = rest.id;
-    }
-    return payload;
 };
 
 const mapPlanFromDB = (data: any): MaintenancePlan => ({
@@ -133,7 +129,7 @@ const mapPlanFromDB = (data: any): MaintenancePlan => ({
 const mapPlanToDB = (data: MaintenancePlan) => ({
     id: data.id,
     description: data.description,
-    equipment_type_id: data.equipmentTypeId === '' ? null : data.equipmentTypeId,
+    equipment_type_id: data.equipmentTypeId,
     frequency: data.frequency,
     tasks: data.tasks,
     target_equipment_ids: data.targetEquipmentIds,
@@ -181,7 +177,6 @@ interface DataContextType {
     generateFullPlanning2026: () => Promise<boolean>;
     runAutoClassification: () => Promise<boolean>;
     refreshPlanTargets: () => Promise<boolean>;
-    compactDatabaseIds: () => Promise<boolean>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -213,6 +208,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 { data: requesterList, error: requesterError },
                 { data: movements, error: movementsError },
             ] = await Promise.all([
+                // Filtra registros que não foram "deletados" (Soft Delete)
                 supabase.from('equipments').select('*').is('deleted_at', null),
                 supabase.from('equipment_types').select('*'),
                 supabase.from('maintenance_plans').select('*').is('deleted_at', null),
@@ -232,6 +228,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             if (requesterError) throw requesterError;
             if (movementsError) throw movementsError;
             
+            // APLICAÇÃO DOS MAPPERS
             setEquipmentData((equipment || []).map(mapEquipmentFromDB));
             setEquipmentTypes(types || []);
             setMaintenancePlans((plans || []).map(mapPlanFromDB));
@@ -260,19 +257,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handleSaveWorkOrder = async (order: WorkOrder): Promise<boolean> => {
         setIsSyncing(true);
         const dbOrder = mapWorkOrderToDB(order);
-        let query;
-        if (dbOrder.id) {
-            query = supabase.from('work_orders').upsert([dbOrder]).select().single();
-        } else {
-            query = supabase.from('work_orders').insert([dbOrder]).select().single();
-        }
-        const { error } = await query;
-        setIsSyncing(false);
+        const { error } = await supabase.from('work_orders').upsert([dbOrder]);
         if (error) {
-            showToast(`Erro ao salvar O.S.: ${error.message}`, 'error');
+            showToast(`Erro: ${error.message}`, 'error');
+            setIsSyncing(false);
             return false;
         }
-        showToast('Ordem de Serviço salva com sucesso!', 'success');
         await fetchData();
         return true;
     };
@@ -280,18 +270,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const handlePlanSave = async (plan: MaintenancePlan): Promise<boolean> => {
         const dbPlan = mapPlanToDB(plan);
         const { error } = await supabase.from('maintenance_plans').upsert([dbPlan]);
-        if (error) { 
-            showToast(`Erro ao salvar plano: ${error.message}`, 'error'); 
-            return false; 
-        }
-        showToast("Plano salvo com sucesso!", "success");
+        if (error) { showToast(`Erro: ${error.message}`, 'error'); return false; }
+        
+        // Após salvar um plano, atualiza os alvos automaticamente
         await refreshPlanTargets();
         await fetchData();
         return true;
     };
 
     const handleUnifiedSave = async (entity: any): Promise<boolean> => {
-        if ('equipmentId' in entity) return handleSaveWorkOrder(entity as WorkOrder);
+        if ('equipmentId' in entity) {
+            return handleSaveWorkOrder(entity as WorkOrder);
+        }
+        showToast("Salvo com sucesso!", "success");
         return true;
     };
 
@@ -304,6 +295,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const handleInventoryAdjustment = async (partId: string, newQuantity: number, reason: string, user: string): Promise<boolean> => {
+        // Mapeamento manual aqui pois é um update parcial
         const { error } = await supabase.from('spare_parts').update({ current_stock: newQuantity }).eq('id', partId);
         if (error) { showToast(`Erro: ${error.message}`, 'error'); return false; }
         const partName = inventoryData.find(p => p.id === partId)?.name || 'N/A';
@@ -342,6 +334,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const handleWorkOrderDelete = async (id: string): Promise<boolean> => {
+        // Implementação de Soft Delete
         const { error } = await supabase.from('work_orders').update({ deleted_at: new Date().toISOString() }).eq('id', id);
         if (error) { showToast(`Erro: ${error.message}`, 'error'); return false; }
         showToast(`Ordem de serviço #${id} movida para lixeira.`, 'info');
@@ -353,13 +346,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const dbEq = mapEquipmentToDB(equipment);
         const { error } = await supabase.from('equipments').upsert([dbEq]);
         if (error) { showToast(`Erro: ${error.message}`, 'error'); return false; }
+        
+        // Após salvar um equipamento, roda a classificação e vinculação
         await runAutoClassification();
         await refreshPlanTargets();
+        
         await fetchData();
         return true;
     };
     
     const handleEquipmentDelete = async (id: string): Promise<boolean> => {
+        // Implementação de Soft Delete para Equipamento
         const { error } = await supabase.from('equipments').update({ deleted_at: new Date().toISOString() }).eq('id', id);
         if (error) { showToast(`Erro: ${error.message}`, 'error'); return false; }
         await fetchData();
@@ -367,6 +364,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     const handlePlanDelete = async (id: string): Promise<boolean> => {
+        // Implementação de Soft Delete para Planos
         const { error } = await supabase.from('maintenance_plans').update({ deleted_at: new Date().toISOString() }).eq('id', id);
         if (error) { showToast(`Erro: ${error.message}`, 'error'); return false; }
         await fetchData();
@@ -389,6 +387,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     const handleBulkDeleteWorkOrders = async (): Promise<boolean> => {
         showToast("Iniciando exclusão em lote...", "warning");
+        // Update all to deleted_at = NOW()
         const { error } = await supabase.from('work_orders').update({ deleted_at: new Date().toISOString() }).neq('id', '0');
         if (error) { showToast(`Erro: ${error.message}`, 'error'); return false; }
         showToast('Todas as Ordens de Serviço foram movidas para lixeira.', 'success');
@@ -396,21 +395,38 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return true;
     };
 
+    // --- FUNÇÕES DE INTELIGÊNCIA (RPC) ---
+
     const runAutoClassification = async (): Promise<boolean> => {
         const { error } = await supabase.rpc('auto_classify_equipments');
-        return !error;
+        if (error) {
+            console.error("Auto Classify Error", error);
+            return false;
+        }
+        return true;
     };
 
     const refreshPlanTargets = async (): Promise<boolean> => {
         const { error } = await supabase.rpc('refresh_plan_targets');
-        return !error;
+        if (error) {
+            console.error("Refresh Targets Error", error);
+            return false;
+        }
+        return true;
     };
 
     const generateFullPlanning2026 = async (): Promise<boolean> => { 
         showToast("Otimizando base de dados...", "info");
+        
+        // 1. Garante que os tipos dos equipamentos estejam corretos
         await runAutoClassification();
+        
+        // 2. Garante que os planos estejam ligados aos equipamentos corretos
         await refreshPlanTargets();
+
         showToast("Gerando cronograma inteligente...", "info");
+        
+        // 3. Gera as O.S.
         const { error } = await supabase.rpc('generate_preventive_orders_for_2026');
         if (error) {
              showToast(`Erro na geração: ${error.message}`, 'error');
@@ -421,37 +437,23 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return true;
     };
 
-    const compactDatabaseIds = async (): Promise<boolean> => {
-        showToast("Reorganizando numeração...", "info");
-        const { data, error } = await supabase.rpc('compact_work_order_ids');
-        if (error) {
-            console.error("Compact IDs Error", error);
-            showToast(`Erro ao reorganizar IDs: ${error.message}`, 'error');
-            return false;
-        }
-        showToast(data || "Numeração reorganizada com sucesso!", "success");
-        await fetchData();
-        return true;
-    };
-
     const logActivity = (activity: any) => console.log("Activity:", activity);
 
     const markTasksAsPrepared = async (keys: string[]) => {
         if (keys.length === 0) return;
         setIsSyncing(true);
         const ids = keys.map(k => k.replace('wo-', ''));
-        const { data, error } = await supabase
+        
+        const { error } = await supabase
             .from('work_orders')
             .update({ status: MaintenanceStatus.InField, is_prepared: true })
-            .in('id', ids)
-            .select('*, equipments(*)');
+            .in('id', ids);
+
         if (error) {
             showToast(`Erro ao mover para campo: ${error.message}`, 'error');
-        } else if (data) {
-            setWorkOrders(prevOrders => {
-                const updatedOrdersMap = new Map(data.map(d => [d.id, mapWorkOrderFromDB(d)]));
-                return prevOrders.map(order => updatedOrdersMap.get(order.id) || order) as WorkOrder[];
-            });
+        } else {
+            showToast(`${ids.length} O.S. movidas para 'Em Campo'.`, 'success');
+            await fetchData();
         }
         setIsSyncing(false);
     };
@@ -460,18 +462,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (keys.length === 0) return;
         setIsSyncing(true);
         const ids = keys.map(k => k.replace('wo-', ''));
-        const { data, error } = await supabase
+        
+        const { error } = await supabase
             .from('work_orders')
             .update({ status: MaintenanceStatus.Scheduled, is_prepared: false })
-            .in('id', ids)
-            .select('*, equipments(*)');
+            .in('id', ids);
+
         if (error) {
             showToast(`Erro ao reverter: ${error.message}`, 'error');
-        } else if (data) {
-            setWorkOrders(prevOrders => {
-                const updatedOrdersMap = new Map(data.map(d => [d.id, mapWorkOrderFromDB(d)]));
-                return prevOrders.map(order => updatedOrdersMap.get(order.id) || order) as WorkOrder[];
-            });
+        } else {
+            showToast(`${ids.length} O.S. retornadas para 'Impressão'.`, 'success');
+            await fetchData();
         }
         setIsSyncing(false);
     };
@@ -499,7 +500,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             handleMaintainerSave, handleMaintainerDelete, handleRequesterSave, handleRequesterDelete, handleWorkOrderDelete, handleBulkDeleteWorkOrders,
             handleEquipmentTypeSave, handleEquipmentTypeDelete, handleEquipmentSave, handleEquipmentDelete, handlePlanDelete,
             forceFullDatabaseRefresh: fetchData, logActivity, revertTasksPreparation, markTasksAsPrepared, handleBulkReprogramPlans, 
-            generateFullPlanning2026, runAutoClassification, refreshPlanTargets, compactDatabaseIds
+            generateFullPlanning2026, runAutoClassification, refreshPlanTargets
         }}>
             {children}
         </DataContext.Provider>
