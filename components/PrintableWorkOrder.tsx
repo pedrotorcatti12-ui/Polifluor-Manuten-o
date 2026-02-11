@@ -1,6 +1,6 @@
+
 import React from 'react';
-// FIX: Import FlatTask type
-import { FlatTask, MaintenanceType } from '../types';
+import { FlatTask, MaintenanceType, PurchaseRequest } from '../types';
 
 interface PrintableWorkOrderProps {
   taskData: FlatTask;
@@ -8,160 +8,128 @@ interface PrintableWorkOrderProps {
   partReplaced?: 'Sim' | 'Não' | '';
   purchasingInvolved?: 'Sim' | 'Não' | '';
   logoUrl?: string;
+  observations?: string;
+  purchaseRequests?: PurchaseRequest[];
 }
 
-const InfoRow: React.FC<{ label: string; value: string | number | undefined; colSpan?: number }> = ({ label, value, colSpan = 1 }) => (
-    <div style={{ gridColumn: `span ${colSpan}` }}>
-        <div className="text-xs font-bold uppercase">{label}</div>
-        <div className="border-b border-black text-sm pb-1">{value || '\u00A0'}</div>
+const InfoField: React.FC<{ label: string; value: string | undefined }> = ({ label, value }) => (
+    <div className="border border-black p-1 bg-white">
+        <div className="text-[8px] font-bold uppercase">{label}</div>
+        <div className="text-xs font-bold h-4">{value || '\u00A0'}</div>
     </div>
 );
 
-const CheckboxDisplay: React.FC<{ label: string; checked: boolean }> = ({ label, checked }) => (
-    <div className="flex items-center gap-2">
-        <div className={`w-4 h-4 border border-black flex items-center justify-center`}>
-            {checked && <span className="text-xs font-bold -mt-0.5">X</span>}
+const CheckboxDisplay: React.FC<{ label?: string; checked?: boolean }> = ({ label, checked = false }) => (
+    <div className="flex items-center justify-center gap-1">
+        <div className={`w-3 h-3 border border-black flex items-center justify-center`}>
+            {checked && <span className="text-xs font-bold">X</span>}
         </div> 
-        {label}
+        {label && <span className="text-[10px]">{label}</span>}
     </div>
 );
 
-const CheckboxQuestion: React.FC<{ question: string; value: 'Sim' | 'Não' | '' }> = ({ question, value }) => (
-    <div className="flex items-center gap-4 text-sm">
-        <span>{question}</span>
-        <CheckboxDisplay label="Sim" checked={value === 'Sim'} />
-        <CheckboxDisplay label="Não" checked={value === 'Não'} />
-    </div>
-);
-
-const PredictiveChecklist = [
-    "Temperatura",
-    "Vibração",
-    "Ultrassom",
-    "Análise de óleo",
-    "Termografia"
-];
-
-export const PrintableWorkOrder: React.FC<PrintableWorkOrderProps> = ({ taskData, editedOsNumber, partReplaced, purchasingInvolved, logoUrl }) => {
+export const PrintableWorkOrder: React.FC<PrintableWorkOrderProps> = ({ taskData, editedOsNumber }) => {
   const { equipment, task } = taskData;
-  // FIX: Add Predictive to MaintenanceType enum to allow this check
-  const isPredictive = task.type === MaintenanceType.Predictive;
-  
-  const logoContent = logoUrl
-    ? <img src={logoUrl} alt="Logo Polifluor" className="h-12" />
-    : (
-        <div className="w-48 h-12 bg-red-600 flex items-center justify-center p-1">
-            <span className="text-white font-bold text-lg" style={{ letterSpacing: '0.15em' }}>POLIFLUOR</span>
-        </div>
-      );
+  const printDate = new Date();
 
   return (
-    <div className="p-8 bg-white text-black font-sans" style={{ width: '210mm', minHeight: '297mm', boxSizing: 'border-box' }}>
-        <header className="flex items-start justify-between pb-4">
-            {logoContent}
-            <div className="text-center">
-                <h1 className="text-2xl font-bold">Ordem de Serviço de Manutenção</h1>
-                <p className="text-sm">Documento para preenchimento em campo</p>
-            </div>
-            <div className="w-48"></div>
-        </header>
+    <div className="p-4 bg-white text-black font-sans box-border flex flex-col justify-between" style={{ width: '210mm', minHeight: '297mm' }}>
+        <div>
+            {/* Header */}
+            <header className="flex items-start justify-between pb-2 mb-2">
+                <div className="w-48 h-12 bg-[#D32F2F] flex items-center justify-center p-1">
+                    <span className="text-white font-black text-xl italic" style={{ letterSpacing: '0.1em' }}>POLIFLUOR</span>
+                </div>
+                <div className="text-center flex-1 mx-4">
+                    <h1 className="text-lg font-black uppercase tracking-tight">Ordem de Serviço de Manutenção</h1>
+                    <h2 className="text-lg font-black uppercase tracking-tight">Preventiva</h2>
+                    <p className="text-xs font-medium mt-1">Documento para preenchimento em campo</p>
+                </div>
+                <div className="w-48 text-right border border-black p-1">
+                    <div className="text-[8px] font-bold uppercase">Código Formulário</div>
+                    <div className="text-xs font-bold">FO-091 REV.02</div>
+                </div>
+            </header>
 
-        <section className="border-2 border-black p-1">
-            <div className="grid grid-cols-4 gap-x-4 gap-y-2">
-                <InfoRow label="N° O.S.:" value={editedOsNumber} />
-                <InfoRow label="Data Programada:" value={`${task.month}/${task.year}`} colSpan={3}/>
-                <InfoRow label="Tipo de Manutenção:" value={task.type || 'N/A'} colSpan={4} />
-                <InfoRow label="Equipamento (ID):" value={equipment.id} />
-                <InfoRow label="Nome:" value={equipment.name} colSpan={3} />
-                <InfoRow label="Localização:" value={equipment.location} colSpan={4}/>
-            </div>
-        </section>
+            {/* Main Info */}
+            <section className="grid grid-cols-2 gap-px bg-black border-2 border-black">
+                <InfoField label="Nº O.S.:" value={editedOsNumber} />
+                <InfoField label="Mês Referência:" value={`${task.month}/${task.year}`} />
+                <InfoField label="Tipo de Manutenção:" value={task.type} />
+                <InfoField label="Equipamento Crítico:" value={equipment.isCritical ? 'SIM (Prioridade Alta)' : 'NÃO'} />
+                <InfoField label="Equipamento (ID):" value={equipment.id} />
+                <InfoField label="Nome / Descrição:" value={equipment.name} />
+                <InfoField label="Localização da Máquina:" value={equipment.location} />
+                <div className="border border-black p-1 bg-white"></div>
+            </section>
 
-        <section className="mt-4">
-            <h2 className="text-md font-bold mb-1">Checklist de Verificação</h2>
-            <table className="w-full border-collapse border-2 border-black">
-                <thead>
-                    <tr className="bg-blue-800 text-white text-sm">
-                        <th className="border border-black p-1 w-12">Item</th>
-                        <th className="border border-black p-1 text-left">Tarefa / Verificação</th>
-                        <th className="border border-black p-1 w-12">OK</th>
-                        <th className="border border-black p-1 w-12">NOK</th>
-                        <th className="border border-black p-1 text-left">Observações da Tarefa</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {(isPredictive ? PredictiveChecklist.map(action => ({ action, materials: '' })) : task.details && task.details.length > 0 ? task.details : [{ action: 'Nenhuma tarefa de checklist definida.', materials: '' }]).map((detail, index) => (
-                         <tr key={index} className="text-sm">
-                            <td className="border border-black p-1 text-center">{index + 1}</td>
-                            <td className="border border-black p-1">{detail.action}</td>
-                            <td className="border border-black p-1 text-center"><div className="w-4 h-4 border border-black mx-auto"></div></td>
-                            <td className="border border-black p-1 text-center"><div className="w-4 h-4 border border-black mx-auto"></div></td>
-                            <td className="border border-black p-1 h-8"></td>
-                        </tr>
-                    ))}
-                    {Array.from({ length: Math.max(0, 5 - (isPredictive ? PredictiveChecklist.length : task.details?.length || 0)) }).map((_, i) => (
-                        <tr key={`empty-${i}`} className="text-sm">
-                            <td className="border border-black p-1 text-center h-8"></td>
-                            <td className="border border-black p-1"></td>
-                            <td className="border border-black p-1 text-center"></td>
-                            <td className="border border-black p-1 text-center"></td>
-                            <td className="border border-black p-1"></td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </section>
-
-        <section className="mt-4">
-            <div className="font-bold text-md">Observações Gerais:</div>
-            <div className="border-2 border-black h-32 mt-1"></div>
-        </section>
-
-        {!isPredictive && (
-            <section className="mt-4">
-                <h2 className="text-md font-bold mb-1">Necessidade de Substituição de Componentes:</h2>
+            {/* Checklist */}
+            <section className="mt-2">
                 <table className="w-full border-collapse border-2 border-black">
-                     <thead>
-                        <tr className="bg-teal-600 text-white text-sm">
-                            <th className="border border-black p-1 text-left">Componente</th>
-                            <th className="border border-black p-1 text-left w-24">Qtd.</th>
-                            <th className="border border-black p-1 text-left">Justificativa</th>
+                    <thead className="bg-black text-white">
+                        <tr>
+                            <th colSpan={5} className="p-1 text-sm font-bold">Checklist de Verificação (Procedimento)</th>
+                        </tr>
+                        <tr className="text-[10px] font-bold uppercase">
+                            <th className="p-1 border border-white w-12">Item</th>
+                            <th className="p-1 border border-white text-left">Tarefa / Verificação Técnica</th>
+                            <th className="p-1 border border-white w-12">OK</th>
+                            <th className="p-1 border border-white w-12">NOK</th>
+                            <th className="p-1 border border-white text-left w-1/3">Observações Técnicas</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {[...Array(3)].map((_, i) => (
-                            <tr key={i} className="h-8">
-                                <td className="border border-black"></td>
-                                <td className="border border-black"></td>
-                                <td className="border border-black"></td>
+                        {(task.details || []).map((detail, index) => (
+                             <tr key={index} className="text-xs border-b border-black h-8">
+                                <td className="p-1 border-r border-black text-center font-bold">{index + 1}</td>
+                                <td className="p-1 border-r border-black font-medium">{detail.action}</td>
+                                <td className="p-1 border-r border-black text-center"><CheckboxDisplay /></td>
+                                <td className="p-1 border-r border-black text-center"><CheckboxDisplay /></td>
+                                <td className="p-1"></td>
                             </tr>
+                        ))}
+                        {[...Array(Math.max(0, 10 - (task.details?.length || 0)))].map((_, i) => (
+                             <tr key={`empty-${i}`} className="h-8"><td className="border-r border-black"></td><td className="border-r border-black"></td><td className="border-r border-black"></td><td className="border-r border-black"></td><td></td></tr>
                         ))}
                     </tbody>
                 </table>
-                 <div className="space-y-2 mt-2">
-                  <CheckboxQuestion question="Houve substituição de produto/peça?" value={partReplaced || ''} />
-                  <CheckboxQuestion question="Houve interação com o setor de compras para substituição?" value={purchasingInvolved || ''} />
-                </div>
             </section>
-        )}
 
-        <footer className="mt-12 text-sm">
+            {/* Observations */}
+            <section className="mt-2">
+                 <table className="w-full border-collapse border-2 border-black">
+                    <thead>
+                        <tr className="bg-black text-white">
+                            <th className="p-1 text-sm font-bold text-left">Observações Gerais / Relatório de Execução:</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr className="h-24"><td className="p-1 align-top">{task.description}</td></tr>
+                    </tbody>
+                 </table>
+            </section>
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-4 pt-4 text-xs">
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 mb-8">
+                 <div><InfoField label="Início Real:" value={''} /></div>
+                 <div><InfoField label="Término Real:" value={''} /></div>
+                 <div><div className="text-right">Aprovado Gestão:</div></div>
+                 <div className="flex items-center gap-4"><CheckboxDisplay label="Sim" /><CheckboxDisplay label="Não" /></div>
+            </div>
+
             <div className="grid grid-cols-2 gap-x-8 gap-y-12">
-                <div>
-                    <p>Início: &nbsp; ____/____/________ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ____:____</p>
-                    <p className="mt-2">Término: ____/____/________ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ____:____</p>
-                </div>
-                 <div className="flex items-center gap-4">
-                    <span>Aprovado:</span>
-                    <CheckboxDisplay label="Sim" checked={false} />
-                    <CheckboxDisplay label="Não" checked={false} />
-                </div>
-                 <div className="text-center">
-                    <div className="border-t border-black pt-1">Executado por (Nome e Assinatura)</div>
+                <div className="text-center">
+                    <div className="border-t-2 border-black pt-1 font-bold">EXECUTADO POR (ASSINATURA)</div>
                 </div>
                 <div className="text-center">
-                    <div className="border-t border-black pt-1">Aprovação da Gestão (Assinatura e Data)</div>
+                    <div className="border-t-2 border-black pt-1 font-bold">VISTO ENCARREGADO / MANUTENÇÃO</div>
                 </div>
+            </div>
+            <div className="mt-4 text-[8px] text-gray-500 flex justify-between">
+                <span>Documento emitido via SGMI 2.0 (Sistema de Gestão de Manutenção Inteligente)</span>
+                <span>Impressão: {printDate.toLocaleString('pt-BR')}</span>
             </div>
         </footer>
     </div>

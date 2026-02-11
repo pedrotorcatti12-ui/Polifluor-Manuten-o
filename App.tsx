@@ -1,7 +1,8 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from './contexts/AppContext';
 import { useDataContext } from './contexts/DataContext';
-import { Page, WorkOrder, MaintenanceStatus, MaintenanceType } from './types';
+import { Page, WorkOrder, MaintenanceStatus, MaintenanceType, UserRole } from './types';
 
 // Import Pages
 import { LoginPage } from './pages/LoginPage';
@@ -28,8 +29,27 @@ import { Sidebar } from './components/Sidebar';
 import { AppHeader } from './components/AppHeader';
 import { MaintenancePlanModal } from './components/MaintenancePlanModal';
 import { CorrectiveRequestModal } from './components/CorrectiveRequestModal';
-import { getNextOSNumber } from './utils/osGenerator';
 import { WorkOrderControlModal } from './components/WorkOrderControlModal';
+
+const pagePermissions: Record<Page, UserRole[]> = {
+    home: ['admin', 'gestor', 'manutencista', 'operador'],
+    work_orders: ['admin', 'gestor', 'manutencista', 'operador'],
+    dashboard: ['admin', 'gestor'],
+    planning: ['admin', 'gestor'],
+    schedule: ['admin', 'gestor', 'manutencista'],
+    equipment: ['admin', 'gestor', 'manutencista'],
+    equipment_types: ['admin'],
+    inventory: ['admin', 'gestor', 'manutencista'],
+    purchasing: ['admin', 'gestor'],
+    inventory_logs: ['admin'],
+    quality: ['admin', 'gestor'],
+    history: ['admin', 'gestor', 'manutencista', 'operador'],
+    reports: ['admin', 'gestor'],
+    settings: ['admin'],
+    documentation: ['admin', 'gestor'],
+    information: ['admin', 'gestor', 'manutencista', 'operador'],
+};
+
 
 const AppContent: React.FC = () => {
     const { 
@@ -47,21 +67,13 @@ const AppContent: React.FC = () => {
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [isCorrectiveModalOpen, setIsCorrectiveModalOpen] = useState(false);
 
-    const nextOSNumber = useMemo(() => getNextOSNumber(equipmentData, workOrders), [workOrders, equipmentData]);
-
     if (!userRole) {
         return <LoginPage onLogin={handleLogin} />;
     }
 
-    const isAdmin = userRole === 'admin';
-
-    const pagesWithAdminAccess: Page[] = [
-        'dashboard', 'planning', 'equipment', 'equipment_types', 'inventory', 
-        'purchasing', 'quality', 'reports', 'settings', 'inventory_logs'
-    ];
-
     const renderPage = () => {
-        if (!isAdmin && pagesWithAdminAccess.includes(currentPage)) {
+        const allowedRoles = pagePermissions[currentPage] || [];
+        if (!allowedRoles.includes(userRole)) {
             return <PermissionDenied />;
         }
         
@@ -89,14 +101,14 @@ const AppContent: React.FC = () => {
     const handleSaveOS = async (order: WorkOrder) => {
         const success = await handleSaveWorkOrder(order);
         if (success) {
-            showToast(`Ordem de Serviço #${order.id} salva.`, 'success');
+            // O toast é disparado dentro do DataContext
         }
     }
     
-    const handleCreateCorrective = async (equipmentId: string, description: string, requester: string, priority: string, osNumber: string, category?: any, failureDateTime?: string, type?: any) => {
-        const nextId = getNextOSNumber(equipmentData, workOrders);
+    const handleCreateCorrective = async (equipmentId: string, description: string, requester: string, priority: string, osNumber: string, category?: any, failureDateTime?: string, type?: any, location?: string) => {
+        // Envia ID vazio para que o banco gere
         const newOrder: WorkOrder = {
-            id: nextId,
+            id: '', 
             equipmentId,
             description,
             requester,
@@ -105,6 +117,7 @@ const AppContent: React.FC = () => {
             scheduledDate: failureDateTime || new Date().toISOString(),
             correctiveCategory: category,
             machineStopped: priority === 'Alta',
+            observations: location, // Salva a localização aqui
         };
         await handleSaveWorkOrder(newOrder);
         setIsCorrectiveModalOpen(false);
@@ -133,11 +146,11 @@ const AppContent: React.FC = () => {
                 <WorkOrderControlModal
                     isOpen={isOSModalOpen}
                     onClose={() => setIsOSModalOpen(false)}
-                    onSave={handleSaveOS} // onSave is passed but the modal uses context directly
+                    onSave={handleSaveOS} 
                     existingOrder={editingOrder}
                     equipmentData={equipmentData}
                     inventoryData={inventoryData}
-                    nextOSNumber={nextOSNumber}
+                    nextOSNumber="" 
                     maintainers={maintainers}
                     requesters={requesters}
                 />
@@ -147,15 +160,15 @@ const AppContent: React.FC = () => {
                 <MaintenancePlanModal
                     isOpen={isPlanModalOpen}
                     onClose={() => setIsPlanModalOpen(false)}
-                    onSave={async (plan) => {
-                        const success = await handlePlanSave(plan);
+                    onSave={async (plan, applyToAll) => {
+                        const success = await handlePlanSave(plan, applyToAll);
                         if (success) {
                             setIsPlanModalOpen(false);
-                            showToast('Plano de Manutenção salvo!', 'success');
                         }
                     }}
                     existingPlan={editingPlan}
                     equipmentTypes={equipmentTypes}
+                    equipmentData={equipmentData}
                 />
             )}
             

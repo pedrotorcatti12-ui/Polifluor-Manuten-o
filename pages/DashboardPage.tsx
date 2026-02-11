@@ -16,6 +16,7 @@ import {
     ArrowRightIcon
 } from '../components/icons';
 import { MaintenanceType, WorkOrder } from '../types';
+import { TrendChart } from '../components/TrendChart'; // Novo Componente
 
 type CriticidadeFilter = 'Criticos' | 'Nao-Criticos';
 
@@ -55,18 +56,17 @@ export const DashboardPage: React.FC = () => {
                 return acc;
             }, {} as Record<string, number>);
 
-            const recurrent = Object.entries(categoryCounts).find(([_, count]) => count >= 3);
+            const recurrent = Object.entries(categoryCounts).find(([_, count]) => (count as number) >= 3);
 
             return {
                 ...metric,
-                recurrentFailure: recurrent ? { category: recurrent[0], count: recurrent[1] } : undefined
+                recurrentFailure: recurrent ? { category: recurrent[0], count: recurrent[1] as number } : undefined
             };
         });
 
     }, [equipmentData, workOrders, calculate, selectedMonth, filterCrit]);
 
     const totals = useMemo(() => {
-        const count = dashboardData.length || 1;
         return dashboardData.reduce((acc, curr) => ({
             mttr: acc.mttr + curr.mttr,
             failures: acc.failures + curr.totalFailures,
@@ -79,6 +79,25 @@ export const DashboardPage: React.FC = () => {
     const avgMttr = totals.mttr / (dashboardData.length || 1);
     const avgAvailability = totals.availability / (dashboardData.length || 1);
     const avgOperationalAvailability = totals.globalAvailability / (dashboardData.length || 1);
+
+    // DADOS PARA O GRÁFICO DE TENDÊNCIA (Evolução MTBF Global)
+    const trendData = useMemo(() => {
+        // Agrupa os dados mensais de todos os equipamentos
+        return MONTHS.map((monthName, idx) => {
+            let monthlyMtbfSum = 0;
+            let count = 0;
+            dashboardData.forEach(item => {
+                const monthMetric = item.monthlyHistory.find(m => m.monthIndex === idx);
+                if (monthMetric && monthMetric.mtbf !== null) {
+                    monthlyMtbfSum += monthMetric.mtbf;
+                    count++;
+                }
+            });
+            // Média simples do MTBF dos equipamentos no mês
+            const avg = count > 0 ? monthlyMtbfSum / count : 0;
+            return { label: monthName.substring(0, 3), value: Math.round(avg) };
+        });
+    }, [dashboardData]);
 
     const handleInspectOS = (id: string) => {
         setCurrentPage('work_orders');
@@ -110,12 +129,26 @@ export const DashboardPage: React.FC = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Disponibilidade Operacional</p><div className="flex items-end gap-2"><span className={`text-3xl font-black ${avgOperationalAvailability > 95 ? 'text-emerald-600' : 'text-amber-500'}`}>{avgOperationalAvailability.toFixed(1)}%</span><ShieldCheckIcon className="w-5 h-5 text-emerald-500 mb-1" /></div></div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Disponibilidade Inerente</p><div className="flex items-end gap-2"><span className={`text-3xl font-black ${avgAvailability > 95 ? 'text-emerald-600' : 'text-amber-500'}`}>{avgAvailability.toFixed(1)}%</span></div></div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">MTTR (Médio)</p><div className="flex items-end gap-2"><span className={`text-3xl font-black ${avgMttr > 1 ? 'text-rose-600' : 'text-emerald-600'}`}>{avgMttr.toFixed(1)}h</span></div></div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total de Falhas</p><div className="flex items-end gap-2"><span className="text-3xl font-black text-slate-800 dark:text-white">{totals.failures}</span><WrenchIcon className="w-5 h-5 text-blue-500 mb-1" /></div></div>
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Horas de Falha (TD)</p><div className="flex items-end gap-2"><span className="text-3xl font-black text-amber-600">{totals.downtime.toFixed(1)}h</span><ClockIcon className="w-5 h-5 text-amber-500 mb-1" /></div></div>
+            {/* SEÇÃO DE KPI E GRÁFICO LADO A LADO */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* KPIs (Ocupa 2 colunas) */}
+                <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Disponibilidade Operacional</p><div className="flex items-end gap-2"><span className={`text-3xl font-black ${avgOperationalAvailability > 95 ? 'text-emerald-600' : 'text-amber-500'}`}>{avgOperationalAvailability.toFixed(1)}%</span><ShieldCheckIcon className="w-5 h-5 text-emerald-500 mb-1" /></div></div>
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Disponibilidade Inerente</p><div className="flex items-end gap-2"><span className={`text-3xl font-black ${avgAvailability > 95 ? 'text-emerald-600' : 'text-amber-500'}`}>{avgAvailability.toFixed(1)}%</span></div></div>
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">MTTR (Médio)</p><div className="flex items-end gap-2"><span className={`text-3xl font-black ${avgMttr > 1 ? 'text-rose-600' : 'text-emerald-600'}`}>{avgMttr.toFixed(1)}h</span></div></div>
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total de Falhas</p><div className="flex items-end gap-2"><span className="text-3xl font-black text-slate-800 dark:text-white">{totals.failures}</span><WrenchIcon className="w-5 h-5 text-blue-500 mb-1" /></div></div>
+                </div>
+
+                {/* Gráfico de Tendência (Ocupa 1 coluna) */}
+                <div className="lg:col-span-1 h-full">
+                    <TrendChart 
+                        data={trendData} 
+                        title="Evolução de Confiabilidade (MTBF Médio)" 
+                        color="#3b82f6" // Blue-500
+                        targetValue={100} // Meta visual de 100h
+                    />
+                </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

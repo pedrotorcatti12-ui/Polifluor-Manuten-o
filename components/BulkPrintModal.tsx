@@ -1,5 +1,4 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
 import { FlatTask, MaintenanceType } from '../types';
 import { CloseIcon, ArrowPathIcon, CheckCircleIcon, ClipboardListIcon } from './icons';
@@ -15,9 +14,10 @@ interface BulkPrintModalProps {
     onClose: () => void;
     tasks: FlatTask[];
     documentType: 'Preventive' | 'Predictive' | 'Corrective';
+    isReprint?: boolean;
 }
 
-export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose, tasks, documentType }) => {
+export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose, tasks, documentType, isReprint = false }) => {
     const { markTasksAsPrepared } = useDataContext();
     const [currentIndex, setCurrentIndex] = useState(-1);
     const [progress, setProgress] = useState(0);
@@ -43,7 +43,10 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose,
             `[ ] O.S. #${t.task.osNumber || 'S/N'} - ${t.equipment.name} (${t.equipment.location})`
         ).join('\n');
         
-        return `PROTOCOLO DE SAÍDA DE O.S. - MANUTENÇÃO\nData: ${date} às ${time}\n\nPrezados,\n\nSeguem as Ordens de Serviço impressas e encaminhadas para execução em campo:\n\n${osList}\n\nStatus no Sistema: EM CAMPO (Aguardando Retorno)\n\nAtenciosamente,\nSGMI 2.0 - Controle de Manutenção`;
+        const actionText = isReprint ? "REIMPRESSAS" : "impressas e encaminhadas";
+        const statusText = isReprint ? "Status no Sistema: PERMANECE EM CAMPO" : "Status no Sistema: EM CAMPO (Aguardando Retorno)";
+
+        return `PROTOCOLO DE SAÍDA DE O.S. - MANUTENÇÃO\nData: ${date} às ${time}\n\nPrezados,\n\nSeguem as Ordens de Serviço ${actionText} para execução em campo:\n\n${osList}\n\n${statusText}\n\nAtenciosamente,\nSGMI 2.0 - Controle de Manutenção`;
     };
 
     const handleCopyEmail = () => {
@@ -65,7 +68,7 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose,
 
     const processNext = async (index: number) => {
         if (index >= tasks.length) {
-            finishProcess();
+            await finishProcess();
             return;
         }
 
@@ -94,13 +97,15 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose,
         }, 300); // Delay para renderização do React
     };
 
-    const finishProcess = () => {
-        const fileName = `LOTE_${documentType.toUpperCase()}_${new Date().getTime()}.pdf`;
+    const finishProcess = async () => {
+        const fileName = `${isReprint ? 'REIMPRESSAO' : 'LOTE'}_${documentType.toUpperCase()}_${new Date().getTime()}.pdf`;
         pdfDoc.current.save(fileName);
         
-        // AQUI: Atualiza o banco de dados mudando status para "Em Campo"
-        const keys = tasks.map(t => t.key);
-        markTasksAsPrepared(keys);
+        // Apenas move para "Em Campo" se não for uma reimpressão
+        if (!isReprint) {
+            const keys = tasks.map(t => t.key);
+            await markTasksAsPrepared(keys);
+        }
         
         setIsFinished(true);
     };
@@ -123,16 +128,16 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose,
                             <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <ClipboardListIcon className="w-8 h-8"/>
                             </div>
-                            <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase mb-2">Imprimir Lote ({tasks.length})</h2>
-                            <p className="text-sm text-gray-500 mb-6">
-                                1. Gera PDF único com todas as O.S.<br/>
-                                2. Muda status para <strong>"EM CAMPO"</strong>.<br/>
-                                3. Gera protocolo de e-mail.
-                            </p>
+                            <h2 className="text-xl font-black text-gray-900 dark:text-white uppercase mb-2">{isReprint ? `Reimprimir Lote (${tasks.length})` : `Imprimir Lote (${tasks.length})`}</h2>
+                            <p className="text-sm text-gray-500 mb-6" dangerouslySetInnerHTML={{ __html: 
+                                isReprint 
+                                ? '1. Gera novo PDF com todas as O.S.<br/>2. O Status <strong>NÃO</strong> será alterado.'
+                                : '1. Gera PDF único com todas as O.S.<br/>2. Muda status para <strong>"EM CAMPO"</strong>.<br/>3. Gera protocolo de e-mail.'
+                            }} />
                             <div className="flex gap-3">
                                 <button onClick={onClose} className="flex-1 py-3 text-xs font-black uppercase text-gray-400 hover:text-gray-600">Cancelar</button>
                                 <button onClick={startProcess} className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-black text-xs uppercase shadow-lg hover:bg-blue-700 transition-all">
-                                    Confirmar e Imprimir
+                                    Confirmar e {isReprint ? 'Reimprimir' : 'Imprimir'}
                                 </button>
                             </div>
                         </>
@@ -154,8 +159,12 @@ export const BulkPrintModal: React.FC<BulkPrintModalProps> = ({ isOpen, onClose,
                             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <CheckCircleIcon className="w-10 h-10"/>
                             </div>
-                            <h3 className="text-xl font-black text-gray-900 uppercase">Sucesso!</h3>
-                            <p className="text-sm text-gray-500 mt-1 mb-6">Status atualizado para <strong>EM CAMPO</strong>.</p>
+                            <h3 className="text-xl font-black text-gray-900 uppercase">{isReprint ? 'Reimpressão Concluída' : 'Sucesso!'}</h3>
+                            <p className="text-sm text-gray-500 mt-1 mb-6" dangerouslySetInnerHTML={{ __html: 
+                                isReprint
+                                ? 'O PDF foi gerado. O status das O.S. permanece "EM CAMPO".'
+                                : 'Status atualizado para <strong>EM CAMPO</strong>.'
+                            }}/>
                             
                             <div className="bg-slate-50 p-4 rounded-xl mb-6 text-left border border-slate-200">
                                 <div className="flex justify-between items-center mb-2">
